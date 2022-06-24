@@ -114,7 +114,7 @@ startup
         { 2019, 64 }, { 2020, 65 }, // Marble Garden Act 1, 2
         { 2021, 66 }, { 2022, 67 }, // Carnival Night Act 1, 2
         { 2023, 68 }, { 2024, 69 }, // Ice Cap Act 1, 2
-        { 2025, 70 }, { 2026, 71 }, // Launch Base Act 1, 2            <<---- needs checking 
+        { 2025, 70 }, { 2026, 71 }, // Launch Base Act 1, 2
         { 2027, 72 }, { 2028, 73 }, // Mushroom Hill Act 1, 2
         { 2029, 74 }, { 2030, 75 }, // Flying Battery Act 1, 2
         { 2031, 76 }, { 2032, 77 }, // Sandopolis Act 1, 2
@@ -171,6 +171,12 @@ split
         if (current.Act == old.Act + 1)
             return true;
     } else {
+        // Act 72 (Mushroom Hill Act 1) needs to be reached after the falling Death Egg cutscene
+        if (current.Act == 72)
+        {
+            if (vars.watchers["Act"].Old == 4 && vars.watchers["Act"].Current != 4)
+                return true;
+        } else
         // Act 85 (credits) can be reached from Sky Sanctuary (Knuckles' ending), DEZ2 or Doomsday Zone
         if (current.Act == 85)
         {
