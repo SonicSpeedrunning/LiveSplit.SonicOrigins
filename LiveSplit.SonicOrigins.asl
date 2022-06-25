@@ -73,7 +73,7 @@ startup
     settings.Add("s2start", true, "Start from Sonic 2", "start");
     settings.Add("s3start", true, "Start from Sonic 3 & Knuckles", "start");
     settings.Add("fixes", true, "Game Fixes");
-    settings.Add("timerbug", true, "Fix Sonic CD timer bug", "fixes");
+    settings.Add("timerbug", false, "Fix Sonic CD timer bug", "fixes");
     settings.Add("autosplitting", true, "Autosplitting");
     settings.Add("s1", true, "Sonic 1", "autosplitting");
     settings.Add("scd", true, "Sonic CD", "autosplitting");
