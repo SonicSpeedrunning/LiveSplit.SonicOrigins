@@ -9,18 +9,50 @@ init
 {
     // Define main watcher variable
     vars.watchers = new MemoryWatcherList();
-    // var scanner = new SignatureScanner(game, modules.First().BaseAddress, modules.First().ModuleMemorySize);
-    // Action<IntPtr> checkptr = (IntPtr addr) => { if (addr == IntPtr.Zero) throw new Exception(); };
+    var ptr = IntPtr.Zero;
+    var scanner = new SignatureScanner(game, modules.First().BaseAddress, modules.First().ModuleMemorySize);
+    Action checkptr = () => { if (ptr == IntPtr.Zero) throw new Exception(); };
+
+
+    // Preliminary support for sigscanning
+    Func<int, int, int, bool, IntPtr> pointerPath = (int offset1, int offset2, int offset3, bool absolute) =>
+    {
+        int tempOffset = game.ReadValue<int>(ptr + offset1);
+        IntPtr tempOffset2 = modules.First().BaseAddress + tempOffset + offset2;
+        if (absolute)
+            return modules.First().BaseAddress + game.ReadValue<int>(tempOffset2) + offset3;
+        else
+            return tempOffset2 + 0x4 + game.ReadValue<int>(tempOffset2) + offset3;
+    };
+
+
+    ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CD FF E1 8B 05")
+        { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }
+    );
+    checkptr();
+    // jumptable 000000014008CB7F
+
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120, 26, 0,      false)) { Name = "Act" });
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 121,  3, 0,      false)) { Name = "TimerIsRunning" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 122,  3, 0,      false)) { Name = "Centisecs" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 123,  3, 0,      false)) { Name = "Secs" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 124,  3, 0,      false)) { Name = "Mins" });
+
 
     vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x3F420D8) { Name = "Game" });
-    vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x3D34FF4) { Name = "Act" });
-
     vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x30D78FC) { Name = "Sonic12StartTrigger" });
     vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x2F49092) { Name = "SonicCDStartTrigger" });
     vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x3701F2C) { Name = "Sonic3SaveSlot" });
 
+    vars.watchers.Add(new MemoryWatcher<bool>(modules.First().BaseAddress + 0x33215B0) { Name = "S3ActClearFlag" });
+
+    vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x2871B71) { Name = "Ticks" });
+
+    vars.Ticks = modules.First().BaseAddress + 0x2871B71;
+
     // Default Act
     current.Act = 0;
+    current.IGT = 0f;
 }
 
 startup
@@ -40,8 +72,8 @@ startup
     settings.Add("scdstart", true, "Start from Sonic CD", "start");
     settings.Add("s2start", true, "Start from Sonic 2", "start");
     settings.Add("s3start", true, "Start from Sonic 3 & Knuckles", "start");
-    //settings.Add("fixes", true, "Game Fixes");
-    //settings.Add("timerbug", true, "Fix Sonic CD timer bug", "fixes");
+    settings.Add("fixes", true, "Game Fixes");
+    settings.Add("timerbug", true, "Fix Sonic CD timer bug", "fixes");
     settings.Add("autosplitting", true, "Autosplitting");
     settings.Add("s1", true, "Sonic 1", "autosplitting");
     settings.Add("scd", true, "Sonic CD", "autosplitting");
@@ -126,6 +158,12 @@ startup
         { 2040, 83 }, { 2041, 83 }, // Death Egg Act 2 and Boss
         { 2042, 84 },               // Doomsday Zone
         { 2005, 85 },               // S3 Ending
+        { 36, 85 },     // VS Egg Wrecker
+        { 37, 86 },     // VS Egg Schorcher
+        { 38, 87 },     // VS Egg Stinger
+        { 39, 88 },     // VS Egg Mobile
+        { 40, 89 },     // VS Egg Spiker
+        { 41, 90 },     // VS Egg Crusher
     };
 }
 
@@ -137,7 +175,27 @@ update
     // Define current Act
     int cAct = vars.watchers["Act"].Current + vars.watchers["Game"].Current * 1000;
     if (vars.Acts.ContainsKey(cAct))
-        current.Act = vars.Acts[cAct];
+    {
+        // Special definition for Angel Island Act 2
+        if (vars.Acts[cAct] == 61)
+        {
+            if (vars.watchers["S3ActClearFlag"].Old && !vars.watchers["S3ActClearFlag"].Current)
+                current.Act = vars.Acts[cAct];
+        } else {
+            current.Act = vars.Acts[cAct];
+        }
+    }
+    
+    // Fixing timer bug in Sonic CD
+    if (settings["timerbug"] && vars.watchers["Game"].Current == vars.Game["SonicCD"])
+    {
+        if (vars.watchers["TimerIsRunning"].Current || vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100f != 0f)
+            current.IGT = vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100f;
+        if (old.IGT > current.IGT)
+        {
+            game.WriteValue<byte>((IntPtr)vars.Ticks, (byte)Math.Round((vars.watchers["Centisecs"].Current / 100f) * 60));
+        }
+    }
 }
 
 start
