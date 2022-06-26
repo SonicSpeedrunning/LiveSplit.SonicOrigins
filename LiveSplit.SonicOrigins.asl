@@ -64,6 +64,9 @@ init
     // jumptable 00000001400A2461
     // print(pointerPath(0x4 * 17,  7, 0,      true).ToString("X"));
 
+    ptr = scanner.Scan(new SigScanTarget(6, "83 4B 58 01") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
+    vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "MenuStart" });
+
     // Default Act
     current.Act = 0;
     current.IGT = 0f;
@@ -83,6 +86,7 @@ startup
 
     // Settings
     settings.Add("start", true, "Autostart options");
+    settings.Add("storystart", true, "Start from Story Mode");
     settings.Add("s1start", true, "Start from Sonic 1", "start");
     settings.Add("scdstart", true, "Start from Sonic CD", "start");
     settings.Add("s2start", true, "Start from Sonic 2", "start");
@@ -213,6 +217,9 @@ update
 
 start
 {
+    if (settings["storystart"] && vars.watchers["MenuStart"].Old > vars.watchers["MenuStart"].Current && vars.watchers["MenuStart"].Current == 76)
+        return true;
+
     if (vars.watchers["Game"].Current == vars.Game["Sonic1"])
     {
         return settings["s1start"] && vars.watchers["Sonic12StartTrigger"].Old == 6 && vars.watchers["Sonic12StartTrigger"].Current == 1;
