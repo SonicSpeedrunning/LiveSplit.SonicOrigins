@@ -31,21 +31,28 @@ init
     );
     checkptr();
     // jumptable 000000014008CB7F
-
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120, 26, 0,      false)) { Name = "Act" });
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 121,  3, 0,      false)) { Name = "TimerIsRunning" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 122,  3, 0,      false)) { Name = "Centisecs" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 123,  3, 0,      false)) { Name = "Secs" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 124,  3, 0,      false)) { Name = "Mins" });
 
+    ptr = scanner.Scan(new SigScanTarget(5, "8B 47 10 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) });
+    checkptr();
+    vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "Game" });
 
-    vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x3F420D8) { Name = "Game" });
     vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x30D78FC) { Name = "Sonic12StartTrigger" });
     vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x2F49092) { Name = "SonicCDStartTrigger" });
+
+
+
+    ptr = scanner.Scan(new SigScanTarget(5, "83 FB 01 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
+    vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "S3Act" });
+
+    vars.watchers.Add(new MemoryWatcher<short>(modules.First().BaseAddress + 0x3701E6A) { Name = "S3XPOS" });
+
     vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x3701F2C) { Name = "Sonic3SaveSlot" });
-
-    vars.watchers.Add(new MemoryWatcher<bool>(modules.First().BaseAddress + 0x33215B0) { Name = "S3ActClearFlag" });
-
+    vars.watchers.Add(new MemoryWatcher<bool>(modules.First().BaseAddress + 0x370A520) { Name = "S3ActClearFlag" });
     vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x2871B71) { Name = "Ticks" });
 
     vars.Ticks = modules.First().BaseAddress + 0x2871B71;
@@ -64,6 +71,7 @@ startup
         new string[] { "Palmtree Panic Act 1", "Palmtree Panic Act 2", "Palmtree Panic Act 3", "Collision Chaos Act 1", "Collision Chaos Act 2", "Collision Chaos Act 3", "Tidal Tempest Act 1", "Tidal Tempest Act 2", "Tidal Tempest Act 3", "Quartz Quadrant Act 1", "Quartz Quadrant Act 2", "Quartz Quadrant Act 3", "Wacky Workbench Act 1", "Wacky Workbench Act 2", "Wacky Workbench Act 3", "Stardust Speedway Act 1", "Stardust Speedway Act 2", "Stardust Speedway Act 3", "Metallic Madness Act 1", "Metallic Madness Act 2", "Metallic Madness Act 3" },
         new string[] { "Emerald Hill Zone - Act 1", "Emerald Hill Zone - Act 2", "Chemical Plant Zone - Act 1", "Chemical Plant Zone - Act 2", "Aquatic Ruin Zone - Act 1", "Aquatic Ruin Zone - Act 2", "Casino Night Zone - Act 1", "Casino Night Zone - Act 2", "Hill Top Zone - Act 1", "Hill Top Zone - Act 2", "Mystic Cave Zone - Act 1", "Mystic Cave Zone - Act 2", "Oil Ocean Zone - Act 1", "Oil Ocean Zone - Act 2", "Metropolis Zone - Act 1", "Metropolis Zone - Act 2", "Metropolis Zone - Act 3", "Sky Chase Zone", "Wing Fortress Zone", "Death Egg Zone"},
         new string[] { "Angel Island Zone - Act 1", "Angel Island Zone - Act 2", "Hydrocity Zone - Act 1", "Hydrocity Zone - Act 2", "Marble Garden Zone - Act 1", "Marble Garden Zone - Act 2", "Carnival Night Zone - Act 1", "Carnival Night Zone - Act 2", "Ice Cap Zone - Act 1", "Ice Cap Zone - Act 2", "Launch Base Zone - Act 1", "Launch Base Zone - Act 2", "Mushroom Hill Zone - Act 1", "Mushroom Hill Zone - Act 2", "Flying Battery Zone - Act 1", "Flying Battery Zone - Act 2", "Sandopolis Zone - Act 1", "Sandopolis Zone - Act 2", "Lava Reef Zone - Act 1", "Lava Reef Zone - Act 2", "Hidden Palace Zone", "Sky Sanctuary Zone", "Death Egg Zone - Act 1", "Death Egg Zone - Act 2", "Doomsday Zone" },
+        // new string[] { "Egg Wrecker", "Egg Scorcher", "Egg Stinger", "Egg Mobile", "Egg Spiker", "Egg Crusher" },
     };
 
     // Settings
@@ -74,11 +82,17 @@ startup
     settings.Add("s3start", true, "Start from Sonic 3 & Knuckles", "start");
     settings.Add("fixes", true, "Game Fixes");
     settings.Add("timerbug", false, "Fix Sonic CD timer bug", "fixes");
-    settings.Add("autosplitting", true, "Autosplitting");
+    settings.Add("autosplitting", true, "Autosplitting - Act list");
     settings.Add("s1", true, "Sonic 1", "autosplitting");
     settings.Add("scd", true, "Sonic CD", "autosplitting");
     settings.Add("s2", true, "Sonic 2", "autosplitting");
     settings.Add("s3", true, "Sonic 3 & Knuckles", "autosplitting");
+    settings.Add("bossrush", true, "Boss Rush");
+    settings.Add("brs1", true, "Sonic 1", "bossrush");
+    settings.Add("brscd", true, "Sonic CD", "bossrush");
+    settings.Add("brs2", true, "Sonic 2", "bossrush");
+    settings.Add("brs3", true, "Sonic 3 & Knuckles", "bossrush");
+
 
     // Adding the acts to the autosplitting settings
     int i = 0;
@@ -141,7 +155,7 @@ startup
         { 1024, 58 },               // Wing Fortress
         { 1025, 59 },               // Death Egg
         { 1001, 60 },               // S2 Ending
-        { 2015, 60 }, { 2016, 61 }, // Angel Island Act 1, 2
+        { 2015, 61 /* 60 */ }, { 2016, 61 }, // Angel Island Act 1, 2
         { 2017, 62 }, { 2018, 63 }, // Hydrocity Act 1, 2
         { 2019, 64 }, { 2020, 65 }, // Marble Garden Act 1, 2
         { 2021, 66 }, { 2022, 67 }, // Carnival Night Act 1, 2
@@ -158,12 +172,13 @@ startup
         { 2040, 83 }, { 2041, 83 }, // Death Egg Act 2 and Boss
         { 2042, 84 },               // Doomsday Zone
         { 2005, 85 },               // S3 Ending
-        { 36, 85 },     // VS Egg Wrecker
-        { 37, 86 },     // VS Egg Schorcher
+        /* { 36, 85 },     // VS Egg Wrecker
+        { 37, 86 },     // VS Egg Scorcher
         { 38, 87 },     // VS Egg Stinger
         { 39, 88 },     // VS Egg Mobile
         { 40, 89 },     // VS Egg Spiker
         { 41, 90 },     // VS Egg Crusher
+        */
     };
 }
 
@@ -173,18 +188,11 @@ update
     vars.watchers.UpdateAll(game);
 
     // Define current Act
-    int cAct = vars.watchers["Act"].Current + vars.watchers["Game"].Current * 1000;
+    int cAct = vars.watchers[(vars.watchers["Game"].Current == vars.Game["Sonic3"] ? "S3" : "") + "Act"].Current + vars.watchers["Game"].Current * 1000;
     if (vars.Acts.ContainsKey(cAct))
-    {
-        // Special definition for Angel Island Act 2
-        if (vars.Acts[cAct] == 61)
-        {
-            if (vars.watchers["S3ActClearFlag"].Old && !vars.watchers["S3ActClearFlag"].Current)
-                current.Act = vars.Acts[cAct];
-        } else {
-            current.Act = vars.Acts[cAct];
-        }
-    }
+        current.Act = vars.Acts[cAct];
+
+    print(current.Act.ToString());
     
     // Fixing timer bug in Sonic CD
     if (settings["timerbug"] && vars.watchers["Game"].Current == vars.Game["SonicCD"])
@@ -218,31 +226,40 @@ split
     if (current.Act == 0)
         return false;
     
+    // 1 = stages; 2 = boss rush
+    // int Mode = current.Act <= 85 ? 1 : 2;
+
     // If you disabled spitting for the stage you completed, there's no need to continue as well
-    if (!settings[old.Act.ToString()])
-        return false;
+    // if (!settings[old.Act.ToString()])
+    //     return false;
 
     // Check what game you're running
     if (vars.watchers["Game"].Current != vars.Game["Sonic3"])
     {
         // In all games except Sonic 3, progression is simple: just split whenever you go to the next stage
-        if (current.Act == old.Act + 1)
+        if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
             return true;
     } else {
-        // Act 72 (Mushroom Hill Act 1) needs to be reached after the falling Death Egg cutscene
-        if (current.Act == 72)
+        // Act 61 (Angel Island Zone) needs special care
+        if (current.Act == 61)
         {
-            if (vars.watchers["Act"].Old == 4 && vars.watchers["Act"].Current != 4)
+            if (settings["60"] && vars.watchers["S3ActClearFlag"].Old && !vars.watchers["S3ActClearFlag"].Current && vars.watchers["S3XPOS"].Current < 4700)
                 return true;
-        } else
-        // Act 85 (credits) can be reached from Sky Sanctuary (Knuckles' ending), DEZ2 or Doomsday Zone
-        if (current.Act == 85)
+        }
+        // Act 72 (Mushroom Hill Act 1) needs to be reached after the falling Death Egg cutscene
+        else if (current.Act == 72)
         {
-            if (old.Act == 81 || old.Act == 83 || old.Act == 84)
+            if (settings[old.Act.ToString()] && vars.watchers["Act"].Old == 4 && vars.watchers["Act"].Current != 4)
+                return true;
+        }
+        // Act 85 (credits) can be reached from Sky Sanctuary (Knuckles' ending), DEZ2 or Doomsday Zone
+        else if (current.Act == 85)
+        {
+            if (settings[old.Act.ToString()] && (old.Act == 81 || old.Act == 83 || old.Act == 84))
                 return true;
         } else {
             // Otherwise, use the standard progression
-            if (current.Act == old.Act + 1)
+            if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
                 return true;
         }
     }
