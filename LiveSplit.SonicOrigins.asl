@@ -191,8 +191,6 @@ update
     int cAct = vars.watchers[(vars.watchers["Game"].Current == vars.Game["Sonic3"] ? "S3" : "") + "Act"].Current + vars.watchers["Game"].Current * 1000;
     if (vars.Acts.ContainsKey(cAct))
         current.Act = vars.Acts[cAct];
-
-    print(current.Act.ToString());
     
     // Fixing timer bug in Sonic CD
     if (settings["timerbug"] && vars.watchers["Game"].Current == vars.Game["SonicCD"])
