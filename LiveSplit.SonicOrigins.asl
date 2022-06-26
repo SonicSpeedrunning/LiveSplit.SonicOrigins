@@ -87,11 +87,11 @@ startup
     settings.Add("scd", true, "Sonic CD", "autosplitting");
     settings.Add("s2", true, "Sonic 2", "autosplitting");
     settings.Add("s3", true, "Sonic 3 & Knuckles", "autosplitting");
-    settings.Add("bossrush", true, "Boss Rush");
-    settings.Add("brs1", true, "Sonic 1", "bossrush");
-    settings.Add("brscd", true, "Sonic CD", "bossrush");
-    settings.Add("brs2", true, "Sonic 2", "bossrush");
-    settings.Add("brs3", true, "Sonic 3 & Knuckles", "bossrush");
+    //settings.Add("bossrush", true, "Boss Rush");
+    //settings.Add("brs1", true, "Sonic 1", "bossrush");
+    //settings.Add("brscd", true, "Sonic CD", "bossrush");
+    //settings.Add("brs2", true, "Sonic 2", "bossrush");
+    //settings.Add("brs3", true, "Sonic 3 & Knuckles", "bossrush");
 
 
     // Adding the acts to the autosplitting settings
