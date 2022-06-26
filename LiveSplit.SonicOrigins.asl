@@ -25,7 +25,6 @@ init
             return tempOffset2 + 0x4 + game.ReadValue<int>(tempOffset2) + offset3;
     };
 
-
     ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CD FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
     // jumptable 000000014008CB7F
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  19, 10, 0x942,  false)) { Name = "SonicCDStartTrigger" });
@@ -34,6 +33,8 @@ init
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 122,  3, 0,      false)) { Name = "Centisecs" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 123,  3, 0,      false)) { Name = "Secs" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 124,  3, 0,      false)) { Name = "Mins" });
+    // Sonic CD RSDK flags
+    // print(pointerPath(0x4 * 11, 7, 0,      true).ToString("X"));
 
     ptr = scanner.Scan(new SigScanTarget(5, "8B 47 10 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "Game" });
@@ -57,6 +58,11 @@ init
     vars.Ticks = pointerPath(0x4 * 1, 51, 0,      false);
     vars.watchers.Add(new MemoryWatcher<byte>((IntPtr)vars.Ticks) { Name = "Ticks" });
     //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x2871B71) { Name = "Ticks" });
+
+    // Sonic 1-2 RSDK flags
+    // ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CC FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
+    // jumptable 00000001400A2461
+    // print(pointerPath(0x4 * 17,  7, 0,      true).ToString("X"));
 
     // Default Act
     current.Act = 0;
