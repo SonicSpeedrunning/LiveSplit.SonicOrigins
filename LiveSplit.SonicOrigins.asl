@@ -1,7 +1,7 @@
 // Sonic Origins autosplitter
 // Coding: Jujstme
 // contacts: just.tribe@gmail.com
-// Version: 1.0.1 (Jun 24th, 2022)
+// Version: 1.0.2 (Jun 26th, 2022)
 
 state("SonicOrigins") {}
 
@@ -26,36 +26,37 @@ init
     };
 
 
-    ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CD FF E1 8B 05")
-        { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }
-    );
-    checkptr();
+    ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CD FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
     // jumptable 000000014008CB7F
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  19, 10, 0x942,  false)) { Name = "SonicCDStartTrigger" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120, 26, 0,      false)) { Name = "Act" });
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 121,  3, 0,      false)) { Name = "TimerIsRunning" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 122,  3, 0,      false)) { Name = "Centisecs" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 123,  3, 0,      false)) { Name = "Secs" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 124,  3, 0,      false)) { Name = "Mins" });
 
-    ptr = scanner.Scan(new SigScanTarget(5, "8B 47 10 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) });
-    checkptr();
+    ptr = scanner.Scan(new SigScanTarget(5, "8B 47 10 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "Game" });
 
-    vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x30D78FC) { Name = "Sonic12StartTrigger" });
-    vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x2F49092) { Name = "SonicCDStartTrigger" });
-
-
+    ptr = scanner.Scan(new SigScanTarget(2, "8B 35 ???????? 89 1D") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) + 0x23D0 }); checkptr();
+    vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "Sonic12StartTrigger" });
+    //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x30D78FC) { Name = "Sonic12StartTrigger" });
 
     ptr = scanner.Scan(new SigScanTarget(5, "83 FB 01 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "S3Act" });
 
-    vars.watchers.Add(new MemoryWatcher<short>(modules.First().BaseAddress + 0x3701E6A) { Name = "S3XPOS" });
+    ptr = scanner.Scan(new SigScanTarget(7, "0F B7 04 5F") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
+    vars.watchers.Add(new MemoryWatcher<short>(ptr + 0xA) { Name = "S3XPOS" });
+    vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xCC) { Name = "Sonic3SaveSlot" });
+    vars.watchers.Add(new MemoryWatcher<bool>(ptr + 0x86C0) { Name = "S3ActClearFlag" });
+    //vars.watchers.Add(new MemoryWatcher<short>(modules.First().BaseAddress + 0x3701E6A) { Name = "S3XPOS" });
+    //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x3701F2C) { Name = "Sonic3SaveSlot" });
+    //vars.watchers.Add(new MemoryWatcher<bool>(modules.First().BaseAddress + 0x370A520) { Name = "S3ActClearFlag" });
 
-    vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x3701F2C) { Name = "Sonic3SaveSlot" });
-    vars.watchers.Add(new MemoryWatcher<bool>(modules.First().BaseAddress + 0x370A520) { Name = "S3ActClearFlag" });
-    vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x2871B71) { Name = "Ticks" });
-
-    vars.Ticks = modules.First().BaseAddress + 0x2871B71;
+    ptr = scanner.Scan(new SigScanTarget(3, "8B 8C 96 ???????? 48 03 CE") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
+    vars.Ticks = pointerPath(0x4 * 1, 51, 0,      false);
+    vars.watchers.Add(new MemoryWatcher<byte>((IntPtr)vars.Ticks) { Name = "Ticks" });
+    //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x2871B71) { Name = "Ticks" });
 
     // Default Act
     current.Act = 0;
