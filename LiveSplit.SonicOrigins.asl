@@ -1,7 +1,7 @@
 // Sonic Origins autosplitter
 // Coding: Jujstme
 // contacts: just.tribe@gmail.com
-// Version: 1.0.2 (Jun 26th, 2022)
+// Version: 1.0.3 (Jun 27th, 2022)
 
 state("SonicOrigins") {}
 
@@ -25,8 +25,8 @@ init
             return tempOffset2 + 0x4 + game.ReadValue<int>(tempOffset2) + offset3;
     };
 
+    // Sonic CD jumptable 000000014008CB7F
     ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CD FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
-    // jumptable 000000014008CB7F
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  19, 10, 0x942,  false)) { Name = "SonicCDStartTrigger" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120, 26, 0,      false)) { Name = "Act" });
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 121,  3, 0,      false)) { Name = "TimerIsRunning" });
@@ -35,7 +35,30 @@ init
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 124,  3, 0,      false)) { Name = "Mins" });
     // Sonic CD RSDK flags
     // print(pointerPath(0x4 * 11, 7, 0,      true).ToString("X"));
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7,  0x2C,  true)) { Name = "SCDLives" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7, 0x22C,  true)) { Name = "SCDMissionCondition" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7, 0x248,  true)) { Name = "SCDMissionClear" });
 
+    // Sonic 1-2 RSDK flags
+    ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CC FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
+    // jumptable 00000001400A2461
+    // print(pointerPath(0x4 * 17,  7, 0,      true).ToString("X"));
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7, 0x1A4,      true)) { Name = "S1PlayMode" }); // Becomes 5 in story mode
+
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7,  0x5C,      true)) { Name = "S1Lives" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7, 0x1F8,      true)) { Name = "S1MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 17,  7, 0x20C,      true)) { Name = "S1MissionClear" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7,  0x64,      true)) { Name = "S2Lives" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7, 0x290,      true)) { Name = "S2MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 17,  7, 0x2A4,      true)) { Name = "S2MissionClear" });
+
+
+    ptr = scanner.Scan(new SigScanTarget(3, "8B 8C 96 ???????? 48 03 CE") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
+    vars.Ticks = pointerPath(0x4 * 1, 51, 0,      false);
+    vars.watchers.Add(new MemoryWatcher<byte>((IntPtr)vars.Ticks) { Name = "Ticks" });
+    //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x2871B71) { Name = "Ticks" });
+
+// General variables
     ptr = scanner.Scan(new SigScanTarget(5, "8B 47 10 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "Game" });
 
@@ -43,6 +66,7 @@ init
     vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "Sonic12StartTrigger" });
     //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x30D78FC) { Name = "Sonic12StartTrigger" });
 
+// Messy Sonic 3 variables
     ptr = scanner.Scan(new SigScanTarget(5, "83 FB 01 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "S3Act" });
 
@@ -53,19 +77,6 @@ init
     //vars.watchers.Add(new MemoryWatcher<short>(modules.First().BaseAddress + 0x3701E6A) { Name = "S3XPOS" });
     //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x3701F2C) { Name = "Sonic3SaveSlot" });
     //vars.watchers.Add(new MemoryWatcher<bool>(modules.First().BaseAddress + 0x370A520) { Name = "S3ActClearFlag" });
-
-    ptr = scanner.Scan(new SigScanTarget(3, "8B 8C 96 ???????? 48 03 CE") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
-    vars.Ticks = pointerPath(0x4 * 1, 51, 0,      false);
-    vars.watchers.Add(new MemoryWatcher<byte>((IntPtr)vars.Ticks) { Name = "Ticks" });
-    //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x2871B71) { Name = "Ticks" });
-
-    // Sonic 1-2 RSDK flags
-    // ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CC FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
-    // jumptable 00000001400A2461
-    // print(pointerPath(0x4 * 17,  7, 0,      true).ToString("X"));
-
-    ptr = scanner.Scan(new SigScanTarget(6, "83 4B 58 01") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
-    vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "MenuStart" });
 
     // Default Act
     current.Act = 0;
@@ -81,16 +92,23 @@ startup
         new string[] { "Palmtree Panic Act 1", "Palmtree Panic Act 2", "Palmtree Panic Act 3", "Collision Chaos Act 1", "Collision Chaos Act 2", "Collision Chaos Act 3", "Tidal Tempest Act 1", "Tidal Tempest Act 2", "Tidal Tempest Act 3", "Quartz Quadrant Act 1", "Quartz Quadrant Act 2", "Quartz Quadrant Act 3", "Wacky Workbench Act 1", "Wacky Workbench Act 2", "Wacky Workbench Act 3", "Stardust Speedway Act 1", "Stardust Speedway Act 2", "Stardust Speedway Act 3", "Metallic Madness Act 1", "Metallic Madness Act 2", "Metallic Madness Act 3" },
         new string[] { "Emerald Hill Zone - Act 1", "Emerald Hill Zone - Act 2", "Chemical Plant Zone - Act 1", "Chemical Plant Zone - Act 2", "Aquatic Ruin Zone - Act 1", "Aquatic Ruin Zone - Act 2", "Casino Night Zone - Act 1", "Casino Night Zone - Act 2", "Hill Top Zone - Act 1", "Hill Top Zone - Act 2", "Mystic Cave Zone - Act 1", "Mystic Cave Zone - Act 2", "Oil Ocean Zone - Act 1", "Oil Ocean Zone - Act 2", "Metropolis Zone - Act 1", "Metropolis Zone - Act 2", "Metropolis Zone - Act 3", "Sky Chase Zone", "Wing Fortress Zone", "Death Egg Zone"},
         new string[] { "Angel Island Zone - Act 1", "Angel Island Zone - Act 2", "Hydrocity Zone - Act 1", "Hydrocity Zone - Act 2", "Marble Garden Zone - Act 1", "Marble Garden Zone - Act 2", "Carnival Night Zone - Act 1", "Carnival Night Zone - Act 2", "Ice Cap Zone - Act 1", "Ice Cap Zone - Act 2", "Launch Base Zone - Act 1", "Launch Base Zone - Act 2", "Mushroom Hill Zone - Act 1", "Mushroom Hill Zone - Act 2", "Flying Battery Zone - Act 1", "Flying Battery Zone - Act 2", "Sandopolis Zone - Act 1", "Sandopolis Zone - Act 2", "Lava Reef Zone - Act 1", "Lava Reef Zone - Act 2", "Hidden Palace Zone", "Sky Sanctuary Zone", "Death Egg Zone - Act 1", "Death Egg Zone - Act 2", "Doomsday Zone" },
-        // new string[] { "Egg Wrecker", "Egg Scorcher", "Egg Stinger", "Egg Mobile", "Egg Spiker", "Egg Crusher" },
+        new string[] { "Egg Wrecker", "Egg Scorcher", "Egg Stinger", "Egg Mobile", "Egg Spiker", "Egg Crusher" },
+        new string[] { "EGG-HVC-001", "Egg Tilter", "Egg Bubble", "Egg Conveyer", "Egg Razer", "Metal Sonic", "Egg Spinner" },
+        new string[] { "Egg Drillster", "Egg Poison", "Egg Hammer", "Egg Claw", "Egg Scorcher Mk.II", "Egg Driller", "Eggmarine", "Egg Bouncer", "Laser Prison", "Mecha Sonic - Death Egg Robo" },
+        //new string[] { "Egg Scorcher Mk.III", "Egg Vortex", "Egg Drillster Mk.II", "Egg Gravitron", "Egg Froster", "Egg Cannon, Egg Rocket, Big Arms", "Egg Scrambler", "Egg Hanger", "Egg Golem", "Egg Inferno", "Giant Eggman Robo" },
     };
 
     // Settings
     settings.Add("start", true, "Autostart options");
-    settings.Add("storystart", true, "Start from Story Mode");
+    settings.Add("storystart", true, "Start from Story Mode", "start");
     settings.Add("s1start", true, "Start from Sonic 1", "start");
     settings.Add("scdstart", true, "Start from Sonic CD", "start");
     settings.Add("s2start", true, "Start from Sonic 2", "start");
     settings.Add("s3start", true, "Start from Sonic 3 & Knuckles", "start");
+    settings.Add("s1bossrush", true, "Start at Boss Rush (Sonic 1)", "start");
+    settings.Add("scdbossrush", true, "Start at Boss Rush (Sonic CD)", "start");
+    settings.Add("s2bossrush", true, "Start at Boss Rush (Sonic 2)", "start");
+    //settings.Add("s3bossrush", true, "Start at Boss Rush (Sonic 3 & Knuckles)", "start");
     settings.Add("fixes", true, "Game Fixes");
     settings.Add("timerbug", false, "Fix Sonic CD timer bug", "fixes");
     settings.Add("autosplitting", true, "Autosplitting - Act list");
@@ -98,28 +116,41 @@ startup
     settings.Add("scd", true, "Sonic CD", "autosplitting");
     settings.Add("s2", true, "Sonic 2", "autosplitting");
     settings.Add("s3", true, "Sonic 3 & Knuckles", "autosplitting");
-    //settings.Add("bossrush", true, "Boss Rush");
-    //settings.Add("brs1", true, "Sonic 1", "bossrush");
-    //settings.Add("brscd", true, "Sonic CD", "bossrush");
-    //settings.Add("brs2", true, "Sonic 2", "bossrush");
+    settings.Add("bossrush", true, "Boss Rush");
+    settings.Add("brs1", true, "Sonic 1", "bossrush");
+    settings.Add("brscd", true, "Sonic CD", "bossrush");
+    settings.Add("brs2", true, "Sonic 2", "bossrush");
     //settings.Add("brs3", true, "Sonic 3 & Knuckles", "bossrush");
 
 
     // Adding the acts to the autosplitting settings
     int i = 0;
+    Func<int, string> entry = (int J) => {
+        switch (J)
+        {
+            case 0: return "s1";
+            case 1: return "scd";
+            case 2: return "s2";
+            case 3: return "s3";
+            case 4: return "brs1";
+            case 5: return "brscd";
+            case 6: return "brs2";
+            case 7: return "brs3";
+            default: return "";
+        }
+    };
     for (int j = 0; j < vars.actsName.Length; j++)
     {
         for (int z = 0; z < vars.actsName[j].Length; z++)
-            settings.Add(i++.ToString(), true, vars.actsName[j][z], j == 0 ? "s1" : j == 1 ? "scd" : j == 2 ? "s2" : "s3");
+            settings.Add(i++.ToString(), true, vars.actsName[j][z], entry(j));
     }
 
     // Dictionaries
-    vars.Game = new Dictionary<string, byte>{
-        { "Sonic1",  0 },
-        { "SonicCD", 3 },
-        { "Sonic2",  1 },
-        { "Sonic3",  2 }
-    };
+    vars.Game = new ExpandoObject();
+    vars.Game.Sonic1 = 0;
+    vars.Game.Sonic2 = 1;
+    vars.Game.Sonic3 = 2;
+    vars.Game.SonicCD = 3;
 
     // Dictionary used to associate the game's internal ID of each act
     // with the index we are going to use in the autosplitter.
@@ -183,13 +214,40 @@ startup
         { 2040, 83 }, { 2041, 83 }, // Death Egg Act 2 and Boss
         { 2042, 84 },               // Doomsday Zone
         { 2005, 85 },               // S3 Ending
-        /* { 36, 85 },     // VS Egg Wrecker
+        { 36, 85 },     // VS Egg Wrecker
         { 37, 86 },     // VS Egg Scorcher
         { 38, 87 },     // VS Egg Stinger
         { 39, 88 },     // VS Egg Mobile
         { 40, 89 },     // VS Egg Spiker
         { 41, 90 },     // VS Egg Crusher
-        */
+        { 3111, 91 },   // VS EGG-HVC-001
+        { 3112, 92 },   // VS Egg Tilter
+        { 3113, 93 },   // VS Egg Bubble
+        { 3114, 94 },   // VS Egg Conveyer
+        { 3115, 95 },   // VS Egg Razer
+        { 3116, 96 },   // VS Metal Sonic
+        { 3117, 97 },   // VS Egg Spinner
+        { 1063, 98 },   // VS Egg Drillster
+        { 1064, 99 },   // VS Egg Poison
+        { 1065, 100 },  // VS Egg Hammer
+        { 1066, 101 },  // VS Egg Claw
+        { 1067, 102 },  // VS Egg Scorcher Mk.II
+        { 1068, 103 },  // VS Egg Driller
+        { 1069, 104 },  // VS Eggmarine
+        { 1070, 105 },  // VS Egg Bouncer
+        { 1071, 106 },  // VS Laser Prison
+        { 1072, 107 },  // VS Mecha Sonic - Death Egg Robo
+        { 2070, 108 },  // VS Egg Scorcher Mk III
+        { 2071, 109 },  // VS Egg Vortex
+        { 2072, 110 },  // VS Egg
+        { 2073, 111 },  // VS Egg Gravitron
+        { 2074, 112 },  // VS Egg Froster
+        { 2075, 113 },  // VS Egg Cannon, Egg Rocket, Big Arms
+        { 2076, 114 },  // VS Egg Scrambler
+        { 2077, 115 },  // VS Egg Hanger
+        { 2078, 116 },  // VS Egg Golem
+        { 2079, 117 },  // VS Egg Inferno
+        { 2080, 118 },  // VS Giant Eggman Robo
     };
 }
 
@@ -199,12 +257,28 @@ update
     vars.watchers.UpdateAll(game);
 
     // Define current Act
-    int cAct = vars.watchers[(vars.watchers["Game"].Current == vars.Game["Sonic3"] ? "S3" : "") + "Act"].Current + vars.watchers["Game"].Current * 1000;
+    int cAct;
+    switch ((byte)vars.watchers["Game"].Current)
+    {
+        default:
+            cAct = vars.watchers["Act"].Current + vars.watchers["Game"].Current * 1000;
+            break;
+        case 2: // Sonic 3
+            cAct = vars.watchers["S3Act"].Current + vars.watchers["Game"].Current * 1000;
+            break;
+    }
     if (vars.Acts.ContainsKey(cAct))
         current.Act = vars.Acts[cAct];
-    
+
+    // Define game mode
+    // 0 = normal; 1 = boss rush
+    if (current.Act < 85 || current.Act == 85 && vars.watchers["Game"].Current == vars.Game.Sonic1)
+        current.GameMode = 0;
+    else
+        current.GameMode = 1;
+
     // Fixing timer bug in Sonic CD
-    if (settings["timerbug"] && vars.watchers["Game"].Current == vars.Game["SonicCD"])
+    if (settings["timerbug"] && vars.watchers["Game"].Current == vars.Game.SonicCD)
     {
         if (vars.watchers["TimerIsRunning"].Current || vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100f != 0f)
             current.IGT = vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100f;
@@ -217,18 +291,29 @@ update
 
 start
 {
-    if (settings["storystart"] && vars.watchers["MenuStart"].Old > vars.watchers["MenuStart"].Current && vars.watchers["MenuStart"].Current == 76)
-        return true;
+    // Story mode
+    if (settings["storystart"] && vars.watchers["S1PlayMode"].Current == 5 && vars.watchers["Act"].Old == 0 && vars.watchers["Act"].Current == 6) return true;
 
-    if (vars.watchers["Game"].Current == vars.Game["Sonic1"])
+    // Sonic 1 boss rush
+    if (settings["s1bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic1 && (vars.watchers["Act"].Old != 36 && vars.watchers["Act"].Current == 36) || (vars.watchers["Act"].Current == 36 && vars.watchers["S1Lives"].Old != 3 && vars.watchers["S1Lives"].Current == 3)) return true;
+
+    // Sonic CD boss rush
+    if (settings["scdbossrush"] && vars.watchers["Game"].Current == vars.Game.SonicCD && (vars.watchers["Act"].Old != 111 && vars.watchers["Act"].Current == 111) || (vars.watchers["Act"].Current == 111 && vars.watchers["SCDLives"].Old != 3 && vars.watchers["SCDLives"].Current == 3)) return true;
+
+    // Sonic 2 boss rush
+    if (settings["s2bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic2 && (vars.watchers["Act"].Old != 63 && vars.watchers["Act"].Current == 63) || (vars.watchers["Act"].Current == 63 && vars.watchers["S2Lives"].Old != 3 && vars.watchers["S2Lives"].Current == 3)) return true;
+
+    // Single games
+    switch ((byte)vars.watchers["Game"].Current)
     {
-        return settings["s1start"] && vars.watchers["Sonic12StartTrigger"].Old == 6 && vars.watchers["Sonic12StartTrigger"].Current == 1;
-    } else if (vars.watchers["Game"].Current == vars.Game["SonicCD"]) {
-        return settings["scdstart"] && vars.watchers["SonicCDStartTrigger"].Old == 11 && vars.watchers["SonicCDStartTrigger"].Current == 2;
-    } else if (vars.watchers["Game"].Current == vars.Game["Sonic2"]) {
-        return settings["s2start"] && vars.watchers["Sonic12StartTrigger"].Old == 8 && vars.watchers["Sonic12StartTrigger"].Current == 9;
-    } else {
-        return settings["s3start"] && vars.watchers["Act"].Old == 2 && vars.watchers["Act"].Current == 15 && vars.watchers["Sonic3SaveSlot"].Current >= 65 && vars.watchers["Sonic3SaveSlot"].Current <= 73;
+        case 0: // Sonic1
+            return settings["s1start"] && vars.watchers["Sonic12StartTrigger"].Old == 6 && vars.watchers["Sonic12StartTrigger"].Current == 1;
+        case 3: // Sonic CD
+            return settings["scdstart"] && vars.watchers["SonicCDStartTrigger"].Old == 11 && vars.watchers["SonicCDStartTrigger"].Current == 2;
+        case 1: // Sonic 2
+            return settings["s2start"] && vars.watchers["Sonic12StartTrigger"].Old == 8 && vars.watchers["Sonic12StartTrigger"].Current == 9;
+        case 2: // Sonic 3
+            return settings["s3start"] && vars.watchers["Act"].Old == 2 && vars.watchers["Act"].Current == 15 && vars.watchers["Sonic3SaveSlot"].Current >= 65 && vars.watchers["Sonic3SaveSlot"].Current <= 73;
     }
 }
 
@@ -239,40 +324,57 @@ split
         return false;
     
     // 1 = stages; 2 = boss rush
-    // int Mode = current.Act <= 85 ? 1 : 2;
+    // current.GameMode = current.Act <= 85 ? 1 : 2;
 
-    // If you disabled spitting for the stage you completed, there's no need to continue as well
-    // if (!settings[old.Act.ToString()])
-    //     return false;
-
-    // Check what game you're running
-    if (vars.watchers["Game"].Current != vars.Game["Sonic3"])
+    // Splitting in Boss rush
+    if (current.GameMode == 2)
     {
-        // In all games except Sonic 3, progression is simple: just split whenever you go to the next stage
-        if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
-            return true;
-    } else {
-        // Act 61 (Angel Island Zone) needs special care
-        if (current.Act == 61)
+        switch ((byte)vars.watchers["Game"].Current)
         {
-            if (settings["60"] && vars.watchers["S3ActClearFlag"].Old && !vars.watchers["S3ActClearFlag"].Current && vars.watchers["S3XPOS"].Current < 4700)
-                return true;
+            case 0: // Sonic 1
+                if (settings["90"] && old.Act == 90 && vars.watchers["S1MissionCondition"].Old == 0 && vars.watchers["S1MissionCondition"].Current == 1)
+                    return true;
+                else if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
+                    return true;
+                break;
+            case 1: // Sonic 2
+                if (settings["107"] && old.Act == 90 && vars.watchers["S2MissionCondition"].Old == 0 && vars.watchers["S2MissionCondition"].Current == 1)
+                    return true;
+                else if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
+                    return true;
+                break;
         }
-        // Act 72 (Mushroom Hill Act 1) needs to be reached after the falling Death Egg cutscene
-        else if (current.Act == 72)
+    }
+
+    // Splitting in normal acts
+    if (current.GameMode == 1)
+    {
+        switch ((byte)vars.watchers["Game"].Current)
         {
-            if (settings[old.Act.ToString()] && vars.watchers["Act"].Old == 4 && vars.watchers["Act"].Current != 4)
-                return true;
-        }
-        // Act 85 (credits) can be reached from Sky Sanctuary (Knuckles' ending), DEZ2 or Doomsday Zone
-        else if (current.Act == 85)
-        {
-            if (settings[old.Act.ToString()] && (old.Act == 81 || old.Act == 83 || old.Act == 84))
-                return true;
-        } else {
-            // Otherwise, use the standard progression
-            if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
-                return true;
+            default:
+                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
+                break;
+            // Split management in Sonic 3 needs special cases
+            case 2:
+                switch ((byte)current.Act)
+                {
+                    // Act 61 Angel Island needs special care
+                    case 61:
+                        if (settings["60"] && vars.watchers["S3ActClearFlag"].Old && !vars.watchers["S3ActClearFlag"].Current && vars.watchers["S3XPOS"].Current < 4700) return true;
+                        break;
+                    // Act 72 (Mushroom Hill Act 1) needs to be reached after the falling Death Egg cutscene
+                    case 72:
+                        if (settings[old.Act.ToString()] && vars.watchers["Act"].Old == 4 && vars.watchers["Act"].Current != 4) return true;
+                        break;
+                    // Act 85 (credits) can be reached from Sky Sanctuary (Knuckles' ending), DEZ2 or Doomsday Zone
+                    case 85:
+                        if (settings[old.Act.ToString()] && (old.Act == 81 || old.Act == 83 || old.Act == 84)) return true;
+                        break;
+                    default:
+                        if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
+                        break;
+                }
+            break;
         }
     }
 }
