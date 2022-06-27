@@ -272,7 +272,7 @@ update
 
     // Define game mode
     // 0 = normal; 1 = boss rush
-    if (current.Act < 85 || current.Act == 85 && vars.watchers["Game"].Current == vars.Game.Sonic1)
+    if (current.Act < 85 || (current.Act == 85 && vars.watchers["Game"].Current == vars.Game.Sonic1))
         current.GameMode = 0;
     else
         current.GameMode = 1;
