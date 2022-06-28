@@ -17,7 +17,7 @@ init
     Action checkptr = () => { if (ptr == IntPtr.Zero) throw new Exception(); };
 
     // Preliminary support for sigscanning
-    Func<int, int, int, bool, IntPtr> pointerPath = (int offset1, int offset2, int offset3, bool absolute) =>
+    Func<int, int, int, bool, IntPtr> pointerPath = (offset1, offset2, offset3, absolute) =>
     {
         int tempOffset = game.ReadValue<int>(ptr + offset1);
         IntPtr tempOffset2 = modules.First().BaseAddress + tempOffset + offset2;
@@ -81,11 +81,11 @@ init
 
 
     // Defining another pointerpath for Sonic 3's shenanigans
-    Func<int, DeepPointer> pointerPath2 = (int offset1) =>
+    Func<int, DeepPointer> pointerPath2 = (offset1) =>
     {
-        int tempOffset = game.ReadValue<int>(ptr + offset1);
-        IntPtr tempOffset2 = modules.First().BaseAddress + tempOffset + 3;
-        IntPtr tempOffset3 = modules.First().BaseAddress + tempOffset + 9;
+        var tempOffset = game.ReadValue<int>(ptr + offset1);
+        var tempOffset2 = modules.First().BaseAddress + tempOffset + 3;
+        var tempOffset3 = tempOffset2 + 6;
         return new DeepPointer(tempOffset2 + game.ReadValue<int>(tempOffset2) + 0x4, game.ReadValue<int>(tempOffset3));
     };
     // jumptable 00000001400D706C
