@@ -13,7 +13,6 @@ init
     var scanner = new SignatureScanner(game, modules.First().BaseAddress, modules.First().ModuleMemorySize);
     Action checkptr = () => { if (ptr == IntPtr.Zero) throw new Exception(); };
 
-
     // Preliminary support for sigscanning
     Func<int, int, int, bool, IntPtr> pointerPath = (int offset1, int offset2, int offset3, bool absolute) =>
     {
@@ -72,11 +71,26 @@ init
 
     ptr = scanner.Scan(new SigScanTarget(7, "0F B7 04 5F") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<short>(ptr + 0xA) { Name = "S3XPOS" });
+    vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xD4) { Name = "S3Lives" });
     vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xCC) { Name = "Sonic3SaveSlot" });
     vars.watchers.Add(new MemoryWatcher<bool>(ptr + 0x86C0) { Name = "S3ActClearFlag" });
     //vars.watchers.Add(new MemoryWatcher<short>(modules.First().BaseAddress + 0x3701E6A) { Name = "S3XPOS" });
     //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x3701F2C) { Name = "Sonic3SaveSlot" });
     //vars.watchers.Add(new MemoryWatcher<bool>(modules.First().BaseAddress + 0x370A520) { Name = "S3ActClearFlag" });
+
+
+    // Defining another pointerpath for Sonic 3's shenanigans
+    Func<int, DeepPointer> pointerPath2 = (int offset1) =>
+    {
+        int tempOffset = game.ReadValue<int>(ptr + offset1);
+        IntPtr tempOffset2 = modules.First().BaseAddress + tempOffset + 3;
+        IntPtr tempOffset3 = modules.First().BaseAddress + tempOffset + 9;
+        return new DeepPointer(tempOffset2 + game.ReadValue<int>(tempOffset2) + 0x4, game.ReadValue<int>(tempOffset3));
+    };
+    // jumptable 00000001400D706C
+    ptr = scanner.Scan(new SigScanTarget(3, "8B 84 81 ???????? 48 03 C1 FF E0") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath2(0x4 * 4)) { Name = "S3MissionCondition" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath2(0x4 * 9)) { Name = "S3MissionClear" });
 
     // Default Act
     current.Act = 0;
@@ -95,7 +109,7 @@ startup
         new string[] { "Egg Wrecker", "Egg Scorcher", "Egg Stinger", "Egg Mobile", "Egg Spiker", "Egg Crusher" },
         new string[] { "EGG-HVC-001", "Egg Tilter", "Egg Bubble", "Egg Conveyer", "Egg Razer", "Metal Sonic", "Egg Spinner" },
         new string[] { "Egg Drillster", "Egg Poison", "Egg Hammer", "Egg Claw", "Egg Scorcher Mk.II", "Egg Driller", "Eggmarine", "Egg Bouncer", "Laser Prison", "Mecha Sonic - Death Egg Robo" },
-        //new string[] { "Egg Scorcher Mk.III", "Egg Vortex", "Egg Drillster Mk.II", "Egg Gravitron", "Egg Froster", "Egg Cannon, Egg Rocket, Big Arms", "Egg Scrambler", "Egg Hanger", "Egg Golem", "Egg Inferno", "Giant Eggman Robo" },
+        new string[] { "Egg Scorcher Mk.III", "Egg Vortex", "Egg Drillster Mk.II", "Egg Gravitron", "Egg Froster", "Egg Cannon, Egg Rocket, Big Arms", "Egg Scrambler", "Egg Hanger", "Egg Golem", "Egg Inferno", "Giant Eggman Robo" },
     };
 
     // Settings
@@ -108,7 +122,7 @@ startup
     settings.Add("s1bossrush", true, "Start at Boss Rush (Sonic 1)", "start");
     settings.Add("scdbossrush", true, "Start at Boss Rush (Sonic CD)", "start");
     settings.Add("s2bossrush", true, "Start at Boss Rush (Sonic 2)", "start");
-    //settings.Add("s3bossrush", true, "Start at Boss Rush (Sonic 3 & Knuckles)", "start");
+    settings.Add("s3bossrush", true, "Start at Boss Rush (Sonic 3 & Knuckles)", "start");
     settings.Add("fixes", true, "Game Fixes");
     settings.Add("timerbug", false, "Fix Sonic CD timer bug", "fixes");
     settings.Add("autosplitting", true, "Autosplitting - Act list");
@@ -120,7 +134,7 @@ startup
     settings.Add("brs1", true, "Sonic 1", "bossrush");
     settings.Add("brscd", true, "Sonic CD", "bossrush");
     settings.Add("brs2", true, "Sonic 2", "bossrush");
-    //settings.Add("brs3", true, "Sonic 3 & Knuckles", "bossrush");
+    settings.Add("brs3", true, "Sonic 3 & Knuckles", "bossrush");
 
 
     // Adding the acts to the autosplitting settings
@@ -287,6 +301,11 @@ update
             game.WriteValue<byte>((IntPtr)vars.Ticks, (byte)Math.Round((vars.watchers["Centisecs"].Current / 100f) * 60));
         }
     }
+
+    // Fix for Sonic 3 mission flag shenanigans
+    if (vars.watchers["Game"].Current == vars.Game.Sonic3)
+    {
+    }
 }
 
 start
@@ -302,6 +321,9 @@ start
 
     // Sonic 2 boss rush
     if (settings["s2bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic2 && (vars.watchers["Act"].Old != 63 && vars.watchers["Act"].Current == 63) || (vars.watchers["Act"].Current == 63 && vars.watchers["S2Lives"].Old != 3 && vars.watchers["S2Lives"].Current == 3)) return true;
+
+    // Sonic 3 boss rush
+    if (settings["s3bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic3 && (vars.watchers["Act"].Old != 70 && vars.watchers["Act"].Current == 70) || (vars.watchers["Act"].Current == 70 && vars.watchers["S3Lives"].Old != 3 && vars.watchers["S3Lives"].Current == 3)) return true;
 
     // Single games
     switch ((byte)vars.watchers["Game"].Current)
@@ -323,11 +345,10 @@ split
     if (current.Act == 0)
         return false;
     
-    // 1 = stages; 2 = boss rush
-    // current.GameMode = current.Act <= 85 ? 1 : 2;
+    // 0 = stages; 1 = boss rush
 
     // Splitting in Boss rush
-    if (current.GameMode == 2)
+    if (current.GameMode == 1)
     {
         switch ((byte)vars.watchers["Game"].Current)
         {
@@ -343,6 +364,12 @@ split
                 else if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
                     return true;
                 break;
+            case 2: // Sonic 3
+                if (settings["118"] && old.Act == 118 && vars.watchers["S3MissionCondition"].Old == 0 && vars.watchers["S3MissionCondition"].Current == 1)
+                    return true;
+                else if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
+                    return true;
+                break;
             case 3: // Sonic CD
                 if (settings["97"] && old.Act == 97 && vars.watchers["SCDMissionCondition"].Old == 0 && vars.watchers["SCDMissionCondition"].Current == 1)
                     return true;
@@ -353,7 +380,7 @@ split
     }
 
     // Splitting in normal acts
-    if (current.GameMode == 1)
+    if (current.GameMode == 0)
     {
         switch ((byte)vars.watchers["Game"].Current)
         {
