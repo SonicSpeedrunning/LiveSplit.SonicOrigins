@@ -7,7 +7,10 @@ state("SonicOrigins") {}
 
 init
 {
+    vars.DebugPrint("Autosplitter Init:");
+
     // Define main watcher variable
+    vars.DebugPrint("   => Setting up MemoryWatchers...");
     vars.watchers = new MemoryWatcherList();
     var ptr = IntPtr.Zero;
     var scanner = new SignatureScanner(game, modules.First().BaseAddress, modules.First().ModuleMemorySize);
@@ -92,6 +95,9 @@ init
     vars.watchers.Add(new MemoryWatcher<byte>(vars.S3MissionCondition) { Name = "S3MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
     vars.watchers.Add(new MemoryWatcher<bool>(vars.S3MissionClear) { Name = "S3MissionClear" });
 
+    // Finished setting up the MemoryWatchers
+    vars.DebugPrint("     => Done");
+
     // Custom functions
     vars.Deref = (Func<DeepPointer, IntPtr>)((a) => { 
         IntPtr _out = IntPtr.Zero;
@@ -100,19 +106,21 @@ init
     });
 
     // Default variables
+    vars.DebugPrint("   => Setting up default state variables...");
     current.Act = 0;
     current.IGT = 0f;
     current.GameMode = 0;
     current.S3MissionCondition = 0;
     current.S3MissionClear = false;
-
+    vars.DebugPrint("     => Done");
+    vars.DebugPrint("   => Init script completed");
 }
 
 startup
 {
     // Array containing the name of every act
     // This is used both in the settings and for debug purposes
-    vars.actsName = new string[][] {
+    var actsName = new string[][] {
         new string[] { "Green Hill Zone - Act 1", "Green Hill Zone - Act 2", "Green Hill Zone - Act 3", "Marble Zone - Act 1", "Marble Zone - Act 2", "Marble Zone - Act 3", "Spring Yard Zone - Act 1", "Spring Yard Zone - Act 2", "Spring Yard Zone - Act 3", "Labyrinth Zone - Act 1", "Labyrinth Zone - Act 2", "Labyrinth Zone - Act 3", "Star Light Zone - Act 1", "Star Light Zone - Act 2", "Star Light Zone - Act 3", "Scrap Brain Zone - Act 1", "Scrap Brain Zone - Act 2", "Scrap Brain Zone - Act 3", "Final Zone" },
         new string[] { "Palmtree Panic Act 1", "Palmtree Panic Act 2", "Palmtree Panic Act 3", "Collision Chaos Act 1", "Collision Chaos Act 2", "Collision Chaos Act 3", "Tidal Tempest Act 1", "Tidal Tempest Act 2", "Tidal Tempest Act 3", "Quartz Quadrant Act 1", "Quartz Quadrant Act 2", "Quartz Quadrant Act 3", "Wacky Workbench Act 1", "Wacky Workbench Act 2", "Wacky Workbench Act 3", "Stardust Speedway Act 1", "Stardust Speedway Act 2", "Stardust Speedway Act 3", "Metallic Madness Act 1", "Metallic Madness Act 2", "Metallic Madness Act 3" },
         new string[] { "Emerald Hill Zone - Act 1", "Emerald Hill Zone - Act 2", "Chemical Plant Zone - Act 1", "Chemical Plant Zone - Act 2", "Aquatic Ruin Zone - Act 1", "Aquatic Ruin Zone - Act 2", "Casino Night Zone - Act 1", "Casino Night Zone - Act 2", "Hill Top Zone - Act 1", "Hill Top Zone - Act 2", "Mystic Cave Zone - Act 1", "Mystic Cave Zone - Act 2", "Oil Ocean Zone - Act 1", "Oil Ocean Zone - Act 2", "Metropolis Zone - Act 1", "Metropolis Zone - Act 2", "Metropolis Zone - Act 3", "Sky Chase Zone", "Wing Fortress Zone", "Death Egg Zone"},
@@ -163,10 +171,14 @@ startup
             default: return "";
         }
     };
-    for (int j = 0; j < vars.actsName.Length; j++)
+    vars.ActsName = new List<string>();
+    for (int j = 0; j < actsName.Length; j++)
     {
-        for (int z = 0; z < vars.actsName[j].Length; z++)
-            settings.Add(i++.ToString(), true, vars.actsName[j][z], entry(j));
+        for (int z = 0; z < actsName[j].Length; z++)
+        {
+            settings.Add(i++.ToString(), true, actsName[j][z], entry(j));
+            vars.ActsName.Add(actsName[j][z]);
+        }
     }
 
     // Dictionaries
@@ -274,6 +286,10 @@ startup
         { 2080, 118 },  // VS Giant Eggman Robo
         { 2084, 119 },  // VS Mecha Sonic Mk.II (Knuckles)
     };
+
+    // Debug functions
+    var debug = true; // Easy flag to quickly enable and disable debug outputs. When they're not needed anymore all it takes is to set this to false.
+    vars.DebugPrint = (Action<string>)((string obj) => { if (debug) print("[Sonic Origins] " + obj); });
 }
 
 update
@@ -326,31 +342,44 @@ update
 start
 {
     // Story mode
-    if (settings["storystart"] && vars.watchers["S1PlayMode"].Current == 5 && vars.watchers["Act"].Old == 0 && vars.watchers["Act"].Current == 6) return true;
+    if (settings["storystart"] && vars.watchers["S1PlayMode"].Current == 5 && vars.watchers["Act"].Old == 0 && vars.watchers["Act"].Current == 6)
+        { vars.DebugPrint("   => Run started: Story mode"); return true; }
 
     // Sonic 1 boss rush
-    if (settings["s1bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic1 && (vars.watchers["Act"].Old != 36 && vars.watchers["Act"].Current == 36) || (vars.watchers["Act"].Current == 36 && vars.watchers["S1Lives"].Old != 3 && vars.watchers["S1Lives"].Current == 3)) return true;
+    if (settings["s1bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic1 && (vars.watchers["Act"].Old != 36 && vars.watchers["Act"].Current == 36) || (vars.watchers["Act"].Current == 36 && vars.watchers["S1Lives"].Old != 3 && vars.watchers["S1Lives"].Current == 3))
+        { vars.DebugPrint("   => Run started: Sonic 1 Boss Rush"); return true; }
 
     // Sonic CD boss rush
-    if (settings["scdbossrush"] && vars.watchers["Game"].Current == vars.Game.SonicCD && (vars.watchers["Act"].Old != 111 && vars.watchers["Act"].Current == 111) || (vars.watchers["Act"].Current == 111 && vars.watchers["SCDLives"].Old != 3 && vars.watchers["SCDLives"].Current == 3)) return true;
+    if (settings["scdbossrush"] && vars.watchers["Game"].Current == vars.Game.SonicCD && (vars.watchers["Act"].Old != 111 && vars.watchers["Act"].Current == 111) || (vars.watchers["Act"].Current == 111 && vars.watchers["SCDLives"].Old != 3 && vars.watchers["SCDLives"].Current == 3))
+        { vars.DebugPrint("   => Run started: Sonic CD Boss Rush"); return true; }
 
     // Sonic 2 boss rush
-    if (settings["s2bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic2 && (vars.watchers["Act"].Old != 63 && vars.watchers["Act"].Current == 63) || (vars.watchers["Act"].Current == 63 && vars.watchers["S2Lives"].Old != 3 && vars.watchers["S2Lives"].Current == 3)) return true;
+    if (settings["s2bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic2 && (vars.watchers["Act"].Old != 63 && vars.watchers["Act"].Current == 63) || (vars.watchers["Act"].Current == 63 && vars.watchers["S2Lives"].Old != 3 && vars.watchers["S2Lives"].Current == 3))
+        { vars.DebugPrint("   => Run started: Sonic 2 Boss Rush"); return true; }
 
     // Sonic 3 boss rush
-    if (settings["s3bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic3 && (vars.watchers["Act"].Old != 70 && vars.watchers["Act"].Current == 70) || (vars.watchers["Act"].Current == 70 && vars.watchers["S3Lives"].Old != 3 && vars.watchers["S3Lives"].Current == 3)) return true;
+    if (settings["s3bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic3 && (vars.watchers["Act"].Old != 70 && vars.watchers["Act"].Current == 70) || (vars.watchers["Act"].Current == 70 && vars.watchers["S3Lives"].Old != 3 && vars.watchers["S3Lives"].Current == 3))
+        { vars.DebugPrint("   => Run started: Sonic 3 Boss Rush"); return true; }
 
     // Single games
     switch ((byte)vars.watchers["Game"].Current)
     {
         case 0: // Sonic1
-            return settings["s1start"] && vars.watchers["Sonic12StartTrigger"].Old == 6 && vars.watchers["Sonic12StartTrigger"].Current == 1;
+            if (settings["s1start"] && vars.watchers["Sonic12StartTrigger"].Old == 6 && vars.watchers["Sonic12StartTrigger"].Current == 1)
+                { vars.DebugPrint("   => Run started: Sonic 1"); return true; }
+            break;
         case 3: // Sonic CD
-            return settings["scdstart"] && vars.watchers["SonicCDStartTrigger"].Old == 11 && vars.watchers["SonicCDStartTrigger"].Current == 2;
+            if (settings["scdstart"] && vars.watchers["SonicCDStartTrigger"].Old == 11 && vars.watchers["SonicCDStartTrigger"].Current == 2)
+                { vars.DebugPrint("   => Run started: Sonic CD"); return true; }
+            break;
         case 1: // Sonic 2
-            return settings["s2start"] && vars.watchers["Sonic12StartTrigger"].Old == 8 && vars.watchers["Sonic12StartTrigger"].Current == 9;
+            if (settings["s2start"] && vars.watchers["Sonic12StartTrigger"].Old == 8 && vars.watchers["Sonic12StartTrigger"].Current == 9)
+                { vars.DebugPrint("   => Run started: Sonic 2"); return true; }
+            break;
         case 2: // Sonic 3
-            return settings["s3start"] && vars.watchers["Act"].Old == 2 && vars.watchers["Act"].Current == 15 && vars.watchers["Sonic3SaveSlot"].Current >= 65 && vars.watchers["Sonic3SaveSlot"].Current <= 73;
+            if (settings["s3start"] && vars.watchers["Act"].Old == 2 && vars.watchers["Act"].Current == 15 && vars.watchers["Sonic3SaveSlot"].Current >= 65 && vars.watchers["Sonic3SaveSlot"].Current <= 73)
+                { vars.DebugPrint("   => Run started: Sonic 3 & Knuckles"); return true; }
+            break;
     }
 }
 
@@ -368,35 +397,35 @@ split
         switch ((byte)vars.watchers["Game"].Current)
         {
             case 0: // Sonic 1
-                if (settings["90"] && old.Act == 90 && vars.watchers["S1MissionCondition"].Old == 0 && vars.watchers["S1MissionCondition"].Current == 1) return true;
-                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
+                if (settings["90"] && old.Act == 90 && vars.watchers["S1MissionCondition"].Old == 0 && vars.watchers["S1MissionCondition"].Current == 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
+                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
                 break;
             case 1: // Sonic 2
-                if (settings["107"] && old.Act == 107 && vars.watchers["S2MissionCondition"].Old == 0 && vars.watchers["S2MissionCondition"].Current == 1) return true;
-                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
+                if (settings["107"] && old.Act == 107 && vars.watchers["S2MissionCondition"].Old == 0 && vars.watchers["S2MissionCondition"].Current == 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
+                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
                 break;
             case 2: // Sonic 3
                 switch ((byte)current.Act)
                 {
                     // Act 112 (Egg Froster) can be accessed even from Act 110 (Egg Drillster Mk.II), especially with Knuckles as he skips Egg Gravitron
                     case 112:
-                        if (settings[old.Act.ToString()] && (old.Act == 110 || old.Act == 111)) return true;
+                        if (settings[old.Act.ToString()] && (old.Act == 110 || old.Act == 111)) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
                         break;
                     // Act 119 (Mecha Sonic Mk.II) is a Knuckles-exclusive boss, and will be accessed directly from Act 116 (Egg Golem)
                     // It's also the final boss for Knuckles, so we need to put the las tboss condition here
                     case 119:
-                        if (settings["116"] && old.Act == 116) return true;
-                        if (settings["119"] && old.Act == 119 && current.S3MissionCondition == 1) return true;
+                        if (settings["116"] && old.Act == 116) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
+                        if (settings["119"] && old.Act == 119 && current.S3MissionCondition == 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
                         break;
                     default:
-                        if (settings["118"] && old.Act == 118 && current.S3MissionCondition == 1) return true;
-                        if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
+                        if (settings["118"] && old.Act == 118 && current.S3MissionCondition == 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
+                        if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
                         break;
                 }
                 break;
             case 3: // Sonic CD
-                if (settings["97"] && old.Act == 97 && vars.watchers["SCDMissionCondition"].Old == 0 && vars.watchers["SCDMissionCondition"].Current == 1) return true;
-                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
+                if (settings["97"] && old.Act == 97 && vars.watchers["SCDMissionCondition"].Old == 0 && vars.watchers["SCDMissionCondition"].Current == 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
+                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
                 break;
         }
     }
@@ -407,7 +436,7 @@ split
         switch ((byte)vars.watchers["Game"].Current)
         {
             default:
-                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
+                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[old.Act]); return true; }
                 break;
             // Split management in Sonic 3 needs special cases
             case 2:
@@ -415,18 +444,18 @@ split
                 {
                     // Act 61 Angel Island needs special care
                     case 61:
-                        if (settings["60"] && vars.watchers["S3ActClearFlag"].Old && !vars.watchers["S3ActClearFlag"].Current && vars.watchers["S3XPOS"].Current < 4700) return true;
+                        if (settings["60"] && vars.watchers["S3ActClearFlag"].Old && !vars.watchers["S3ActClearFlag"].Current && vars.watchers["S3XPOS"].Current < 4700) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[60]); return true; }
                         break;
                     // Act 72 (Mushroom Hill Act 1) needs to be reached after the falling Death Egg cutscene
                     case 72:
-                        if (settings[old.Act.ToString()] && vars.watchers["Act"].Old == 4 && vars.watchers["Act"].Current != 4) return true;
+                        if (settings[old.Act.ToString()] && vars.watchers["Act"].Old == 4 && vars.watchers["Act"].Current != 4) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[71]); return true; }
                         break;
                     // Act 85 (credits) can be reached from Sky Sanctuary (Knuckles' ending), DEZ2 or Doomsday Zone
                     case 85:
-                        if (settings[old.Act.ToString()] && (old.Act == 81 || old.Act == 83 || old.Act == 84)) return true;
+                        if (settings[old.Act.ToString()] && (old.Act == 81 || old.Act == 83 || old.Act == 84)) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[old.Act]); return true; }
                         break;
                     default:
-                        if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
+                        if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[old.Act]); return true; }
                         break;
                 }
             break;
