@@ -16,7 +16,7 @@ init
     var scanner = new SignatureScanner(game, modules.First().BaseAddress, modules.First().ModuleMemorySize);
     Action checkptr = () => { if (ptr == IntPtr.Zero) throw new Exception(); };
 
-    // Preliminary support for sigscanning
+    // Functions needed for sigscanning
     Func<int, int, int, bool, IntPtr> pointerPath = (offset1, offset2, offset3, absolute) =>
     {
         int tempOffset = game.ReadValue<int>(ptr + offset1);
@@ -35,15 +35,14 @@ init
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 122,  3, 0,      false)) { Name = "Centisecs" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 123,  3, 0,      false)) { Name = "Secs" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 124,  3, 0,      false)) { Name = "Mins" });
-    // Sonic CD RSDK flags
-    // print(pointerPath(0x4 * 11, 7, 0,      true).ToString("X"));
+
+    // Sonic CD RSDK flags (RSDKv3) // print(pointerPath(0x4 * 11, 7, 0,      true).ToString("X"));
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7,  0x2C,  true)) { Name = "SCDLives" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7, 0x22C,  true)) { Name = "SCDMissionCondition" });
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 *  11, 7, 0x248,  true)) { Name = "SCDMissionClear" });
 
-    // Sonic 1-2 RSDK flags
+    // Sonic 1-2 RSDK flags (RSDKv4) // jumptable 00000001400A2461 // print(pointerPath(0x4 * 17,  7, 0,      true).ToString("X"));
     ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CC FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
-    // jumptable 00000001400A2461 // print(pointerPath(0x4 * 17,  7, 0,      true).ToString("X"));
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7, 0x1A4,      true)) { Name = "S1PlayMode" }); // Becomes 5 in story mode
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7,  0x5C,      true)) { Name = "S1Lives" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7, 0x1F8,      true)) { Name = "S1MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
@@ -56,7 +55,6 @@ init
     ptr = scanner.Scan(new SigScanTarget(3, "8B 8C 96 ???????? 48 03 CE") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
     vars.Ticks = pointerPath(0x4 * 1, 51, 0,      false);
     vars.watchers.Add(new MemoryWatcher<byte>((IntPtr)vars.Ticks) { Name = "Ticks" });
-    //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x2871B71) { Name = "Ticks" });
 
 // General variables
     ptr = scanner.Scan(new SigScanTarget(5, "8B 47 10 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
@@ -64,7 +62,6 @@ init
 
     ptr = scanner.Scan(new SigScanTarget(2, "8B 35 ???????? 89 1D") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) + 0x23D0 }); checkptr();
     vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "Sonic12StartTrigger" });
-    //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x30D78FC) { Name = "Sonic12StartTrigger" });
 
 // Messy Sonic 3 variables
     ptr = scanner.Scan(new SigScanTarget(5, "83 FB 01 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
@@ -75,9 +72,10 @@ init
     vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xD4) { Name = "S3Lives" });
     vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xCC) { Name = "Sonic3SaveSlot" });
     vars.watchers.Add(new MemoryWatcher<bool>(ptr + 0x86C0) { Name = "S3ActClearFlag" }); 
-    //vars.watchers.Add(new MemoryWatcher<short>(modules.First().BaseAddress + 0x3701E6A) { Name = "S3XPOS" });
-    //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x3701F2C) { Name = "Sonic3SaveSlot" });
-    //vars.watchers.Add(new MemoryWatcher<bool>(modules.First().BaseAddress + 0x370A520) { Name = "S3ActClearFlag" });
+
+    ptr = scanner.Scan(new SigScanTarget(3, "4C 39 35 ???????? 74 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
+    vars.watchers.Add(new MemoryWatcher<long>(ptr) { Name = "S3HPZFlag_0" });
+    vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr, 0x4)) { Name = "S3HPZFlag_1", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });
 
 
     // Defining another pointerpath for Sonic 3's shenanigans
@@ -305,7 +303,14 @@ update
             cAct = vars.watchers["Act"].Current + vars.watchers["Game"].Current * 1000;
             break;
         case 2: // Sonic 3
-            cAct = vars.watchers["S3Act"].Current + vars.watchers["Game"].Current * 1000;
+            // If the flags for HPZ are set (which implies we are either in the emerald altair or at the results tally after a special stage),
+            // we need to prevent the script from changing the current act.
+            if (vars.watchers["S3Act"].Current == 36 && (vars.watchers["S3HPZFlag_0"].Current == 0 || vars.watchers["S3HPZFlag_1"].Current != 0))
+            {
+                cAct = -1;
+            } else {
+                cAct = vars.watchers["S3Act"].Current + vars.watchers["Game"].Current * 1000;
+            }
             break;
     }
     if (vars.Acts.ContainsKey(cAct))
@@ -412,7 +417,7 @@ split
                         if (settings[old.Act.ToString()] && (old.Act == 110 || old.Act == 111)) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
                         break;
                     // Act 119 (Mecha Sonic Mk.II) is a Knuckles-exclusive boss, and will be accessed directly from Act 116 (Egg Golem)
-                    // It's also the final boss for Knuckles, so we need to put the las tboss condition here
+                    // It's also the final boss for Knuckles, so we need to put the last boss condition here
                     case 119:
                         if (settings["116"] && old.Act == 116) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
                         if (settings["119"] && old.Act == 119 && current.S3MissionCondition == 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
@@ -448,7 +453,11 @@ split
                         break;
                     // Act 72 (Mushroom Hill Act 1) needs to be reached after the falling Death Egg cutscene
                     case 72:
-                        if (settings[old.Act.ToString()] && vars.watchers["Act"].Old == 4 && vars.watchers["Act"].Current != 4) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[71]); return true; }
+                        if (settings[old.Act.ToString()] && vars.watchers["S3Act"].Old == 4) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[71]); return true; }
+                        break;
+                    // Act 80 (Hidden Palace) can be accessed from any previous level, thanks to the wrong warp
+                    case 80:
+                        if (settings[old.Act.ToString()] && old.Act >= 72 && old.Act < current.Act) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[old.Act]); return true; }
                         break;
                     // Act 85 (credits) can be reached from Sky Sanctuary (Knuckles' ending), DEZ2 or Doomsday Zone
                     case 85:
