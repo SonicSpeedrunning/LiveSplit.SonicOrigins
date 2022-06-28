@@ -338,7 +338,13 @@ split
                     return true;
                 break;
             case 1: // Sonic 2
-                if (settings["107"] && old.Act == 90 && vars.watchers["S2MissionCondition"].Old == 0 && vars.watchers["S2MissionCondition"].Current == 1)
+                if (settings["107"] && old.Act == 107 && vars.watchers["S2MissionCondition"].Old == 0 && vars.watchers["S2MissionCondition"].Current == 1)
+                    return true;
+                else if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
+                    return true;
+                break;
+            case 3: // Sonic CD
+                if (settings["97"] && old.Act == 97 && vars.watchers["SCDMissionCondition"].Old == 0 && vars.watchers["SCDMissionCondition"].Current == 1)
                     return true;
                 else if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
                     return true;
