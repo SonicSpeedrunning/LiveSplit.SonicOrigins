@@ -1,7 +1,7 @@
 // Sonic Origins autosplitter
 // Coding: Jujstme
 // contacts: just.tribe@gmail.com
-// Version: 1.0.3 (Jun 27th, 2022)
+// Version: 1.0.5 (Jun 28th, 2022)
 
 state("SonicOrigins") {}
 
@@ -120,7 +120,7 @@ startup
         new string[] { "Egg Wrecker", "Egg Scorcher", "Egg Stinger", "Egg Mobile", "Egg Spiker", "Egg Crusher" },
         new string[] { "EGG-HVC-001", "Egg Tilter", "Egg Bubble", "Egg Conveyer", "Egg Razer", "Metal Sonic", "Egg Spinner" },
         new string[] { "Egg Drillster", "Egg Poison", "Egg Hammer", "Egg Claw", "Egg Scorcher Mk.II", "Egg Driller", "Eggmarine", "Egg Bouncer", "Laser Prison", "Mecha Sonic - Death Egg Robo" },
-        new string[] { "Egg Scorcher Mk.III", "Egg Vortex", "Egg Drillster Mk.II", "Egg Gravitron", "Egg Froster", "Egg Cannon, Egg Rocket, Big Arms", "Egg Scrambler", "Egg Hanger", "Egg Golem", "Egg Inferno", "Giant Eggman Robo" },
+        new string[] { "Egg Scorcher Mk.III", "Egg Vortex", "Egg Drillster Mk.II", "Egg Gravitron (Sonic/Tails only)", "Egg Froster", "Egg Cannon, Egg Rocket, Big Arms", "Egg Scrambler", "Egg Hanger", "Egg Golem", "Egg Inferno (Sonic/Tails only)", "Giant Eggman Robo (Sonic/Tails only)", "Mecha Sonic Mk.II (Knuckles only)" },
     };
 
     // Settings
@@ -263,7 +263,7 @@ startup
         { 1072, 107 },  // VS Mecha Sonic - Death Egg Robo
         { 2070, 108 },  // VS Egg Scorcher Mk III
         { 2071, 109 },  // VS Egg Vortex
-        { 2072, 110 },  // VS Egg
+        { 2072, 110 },  // VS Egg Drillster Mk.II
         { 2073, 111 },  // VS Egg Gravitron
         { 2074, 112 },  // VS Egg Froster
         { 2075, 113 },  // VS Egg Cannon, Egg Rocket, Big Arms
@@ -272,6 +272,7 @@ startup
         { 2078, 116 },  // VS Egg Golem
         { 2079, 117 },  // VS Egg Inferno
         { 2080, 118 },  // VS Giant Eggman Robo
+        { 2084, 119 },  // VS Mecha Sonic Mk.II (Knuckles)
     };
 }
 
@@ -367,28 +368,35 @@ split
         switch ((byte)vars.watchers["Game"].Current)
         {
             case 0: // Sonic 1
-                if (settings["90"] && old.Act == 90 && vars.watchers["S1MissionCondition"].Old == 0 && vars.watchers["S1MissionCondition"].Current == 1)
-                    return true;
-                else if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
-                    return true;
+                if (settings["90"] && old.Act == 90 && vars.watchers["S1MissionCondition"].Old == 0 && vars.watchers["S1MissionCondition"].Current == 1) return true;
+                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
                 break;
             case 1: // Sonic 2
-                if (settings["107"] && old.Act == 107 && vars.watchers["S2MissionCondition"].Old == 0 && vars.watchers["S2MissionCondition"].Current == 1)
-                    return true;
-                else if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
-                    return true;
+                if (settings["107"] && old.Act == 107 && vars.watchers["S2MissionCondition"].Old == 0 && vars.watchers["S2MissionCondition"].Current == 1) return true;
+                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
                 break;
             case 2: // Sonic 3
-                if (settings["118"] && old.Act == 118 && current.S3MissionCondition == 1)
-                    return true;
-                else if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
-                    return true;
+                switch ((byte)current.Act)
+                {
+                    // Act 112 (Egg Froster) can be accessed even from Act 110 (Egg Drillster Mk.II), especially with Knuckles as he skips Egg Gravitron
+                    case 112:
+                        if (settings[old.Act.ToString()] && (old.Act == 110 || old.Act == 111)) return true;
+                        break;
+                    // Act 119 (Mecha Sonic Mk.II) is a Knuckles-exclusive boss, and will be accessed directly from Act 116 (Egg Golem)
+                    // It's also the final boss for Knuckles, so we need to put the las tboss condition here
+                    case 119:
+                        if (settings["116"] && old.Act == 116) return true;
+                        if (settings["119"] && old.Act == 119 && current.S3MissionCondition == 1) return true;
+                        break;
+                    default:
+                        if (settings["118"] && old.Act == 118 && current.S3MissionCondition == 1) return true;
+                        if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
+                        break;
+                }
                 break;
             case 3: // Sonic CD
-                if (settings["97"] && old.Act == 97 && vars.watchers["SCDMissionCondition"].Old == 0 && vars.watchers["SCDMissionCondition"].Current == 1)
-                    return true;
-                else if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
-                    return true;
+                if (settings["97"] && old.Act == 97 && vars.watchers["SCDMissionCondition"].Old == 0 && vars.watchers["SCDMissionCondition"].Current == 1) return true;
+                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) return true;
                 break;
         }
     }
