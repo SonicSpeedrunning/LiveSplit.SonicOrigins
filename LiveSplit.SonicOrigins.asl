@@ -133,15 +133,15 @@ startup
 
     // Settings
     settings.Add("start", true, "Autostart options");
-    settings.Add("storystart", true, "Start from Story Mode", "start");
-    settings.Add("s1start", true, "Start from Sonic 1", "start");
-    settings.Add("scdstart", true, "Start from Sonic CD", "start");
-    settings.Add("s2start", true, "Start from Sonic 2", "start");
-    settings.Add("s3start", true, "Start from Sonic 3 & Knuckles", "start");
-    settings.Add("s1bossrush", true, "Start at Boss Rush (Sonic 1)", "start");
-    settings.Add("scdbossrush", true, "Start at Boss Rush (Sonic CD)", "start");
-    settings.Add("s2bossrush", true, "Start at Boss Rush (Sonic 2)", "start");
-    settings.Add("s3bossrush", true, "Start at Boss Rush (Sonic 3 & Knuckles)", "start");
+    settings.Add("storystart", true, "Story Mode", "start");
+    settings.Add("s1start", true, "Sonic 1", "start");
+    settings.Add("scdstart", true, "Sonic CD", "start");
+    settings.Add("s2start", true, "Sonic 2", "start");
+    settings.Add("s3start", true, "Sonic 3 & Knuckles", "start");
+    settings.Add("s1bossrush", true, "Boss Rush (Sonic 1)", "start");
+    settings.Add("scdbossrush", true, "Boss Rush (Sonic CD)", "start");
+    settings.Add("s2bossrush", true, "Boss Rush (Sonic 2)", "start");
+    settings.Add("s3bossrush", true, "Boss Rush (Sonic 3 & Knuckles)", "start");
     settings.Add("fixes", true, "Game Fixes");
     settings.Add("timerbug", false, "Fix Sonic CD timer bug", "fixes");
     settings.Add("autosplitting", true, "Autosplitting - Act list");
