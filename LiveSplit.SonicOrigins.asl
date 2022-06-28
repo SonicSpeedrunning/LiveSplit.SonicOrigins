@@ -36,14 +36,12 @@ init
     // print(pointerPath(0x4 * 11, 7, 0,      true).ToString("X"));
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7,  0x2C,  true)) { Name = "SCDLives" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7, 0x22C,  true)) { Name = "SCDMissionCondition" });
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7, 0x248,  true)) { Name = "SCDMissionClear" });
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 *  11, 7, 0x248,  true)) { Name = "SCDMissionClear" });
 
     // Sonic 1-2 RSDK flags
     ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CC FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
-    // jumptable 00000001400A2461
-    // print(pointerPath(0x4 * 17,  7, 0,      true).ToString("X"));
+    // jumptable 00000001400A2461 // print(pointerPath(0x4 * 17,  7, 0,      true).ToString("X"));
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7, 0x1A4,      true)) { Name = "S1PlayMode" }); // Becomes 5 in story mode
-
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7,  0x5C,      true)) { Name = "S1Lives" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7, 0x1F8,      true)) { Name = "S1MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 17,  7, 0x20C,      true)) { Name = "S1MissionClear" });
@@ -73,7 +71,7 @@ init
     vars.watchers.Add(new MemoryWatcher<short>(ptr + 0xA) { Name = "S3XPOS" });
     vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xD4) { Name = "S3Lives" });
     vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xCC) { Name = "Sonic3SaveSlot" });
-    vars.watchers.Add(new MemoryWatcher<bool>(ptr + 0x86C0) { Name = "S3ActClearFlag" });
+    vars.watchers.Add(new MemoryWatcher<bool>(ptr + 0x86C0) { Name = "S3ActClearFlag" }); 
     //vars.watchers.Add(new MemoryWatcher<short>(modules.First().BaseAddress + 0x3701E6A) { Name = "S3XPOS" });
     //vars.watchers.Add(new MemoryWatcher<byte>(modules.First().BaseAddress + 0x3701F2C) { Name = "Sonic3SaveSlot" });
     //vars.watchers.Add(new MemoryWatcher<bool>(modules.First().BaseAddress + 0x370A520) { Name = "S3ActClearFlag" });
@@ -89,12 +87,25 @@ init
     };
     // jumptable 00000001400D706C
     ptr = scanner.Scan(new SigScanTarget(3, "8B 84 81 ???????? 48 03 C1 FF E0") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath2(0x4 * 4)) { Name = "S3MissionCondition" });
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath2(0x4 * 9)) { Name = "S3MissionClear" });
+    vars.S3MissionCondition = pointerPath2(0x4 * 4);
+    vars.S3MissionClear = pointerPath2(0x4 * 9);
+    vars.watchers.Add(new MemoryWatcher<byte>(vars.S3MissionCondition) { Name = "S3MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
+    vars.watchers.Add(new MemoryWatcher<bool>(vars.S3MissionClear) { Name = "S3MissionClear" });
 
-    // Default Act
+    // Custom functions
+    vars.Deref = (Func<DeepPointer, IntPtr>)((a) => { 
+        IntPtr _out = IntPtr.Zero;
+        a.DerefOffsets(memory, out _out);
+        return _out;
+    });
+
+    // Default variables
     current.Act = 0;
     current.IGT = 0f;
+    current.GameMode = 0;
+    current.S3MissionCondition = 0;
+    current.S3MissionClear = false;
+
 }
 
 startup
@@ -136,7 +147,6 @@ startup
     settings.Add("brs2", true, "Sonic 2", "bossrush");
     settings.Add("brs3", true, "Sonic 3 & Knuckles", "bossrush");
 
-
     // Adding the acts to the autosplitting settings
     int i = 0;
     Func<int, string> entry = (int J) => {
@@ -176,7 +186,7 @@ startup
         { 18, 12 }, { 19, 13 }, { 20, 14 }, // Starlight Zone 1, 2, 3
         { 21, 15 }, { 22, 16 }, { 23, 17 }, // Scrap Brain 1, 2, 3
         { 24, 18 },                         // Final Zone
-        {  1, 19 },                         // S1 ending
+        {  1, 19 }, { 2, 19 },              // S1 ending
         { 3013, 19 }, { 3014, 19 }, { 3015, 19 }, { 3016, 19 }, // Palmtree Panic Act 1
         { 3017, 20 }, { 3018, 20 }, { 3019, 20 }, { 3020, 20 }, // Palmtree Panic Act 2
         { 3021, 21 }, { 3022, 21 },                             // Palmtree Panic Act 3
@@ -210,7 +220,7 @@ startup
         { 1023, 57 },               // Sky Chase
         { 1024, 58 },               // Wing Fortress
         { 1025, 59 },               // Death Egg
-        { 1001, 60 },               // S2 Ending
+        { 1001, 60 }, { 1002, 60 }, // S2 Ending
         { 2015, 61 /* 60 */ }, { 2016, 61 }, // Angel Island Act 1, 2
         { 2017, 62 }, { 2018, 63 }, // Hydrocity Act 1, 2
         { 2019, 64 }, { 2020, 65 }, // Marble Garden Act 1, 2
@@ -305,6 +315,10 @@ update
     // Fix for Sonic 3 mission flag shenanigans
     if (vars.watchers["Game"].Current == vars.Game.Sonic3)
     {
+        current.S3MissionCondition = vars.watchers["S3MissionCondition"].Current;
+        current.S3MissionClear = vars.watchers["S3MissionClear"].Current;
+        if (current.S3MissionCondition > 0) game.WriteValue<byte>((IntPtr)vars.Deref(vars.S3MissionCondition), 0);
+        if (current.S3MissionClear) game.WriteValue<byte>((IntPtr)vars.Deref(vars.S3MissionClear), 0);
     }
 }
 
@@ -365,7 +379,7 @@ split
                     return true;
                 break;
             case 2: // Sonic 3
-                if (settings["118"] && old.Act == 118 && vars.watchers["S3MissionCondition"].Old == 0 && vars.watchers["S3MissionCondition"].Current == 1)
+                if (settings["118"] && old.Act == 118 && current.S3MissionCondition == 1)
                     return true;
                 else if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
                     return true;
