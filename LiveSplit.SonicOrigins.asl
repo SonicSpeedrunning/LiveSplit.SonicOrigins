@@ -1,7 +1,8 @@
-// Sonic Origins autosplitter
+// Sonic Origins
+// Autosplitter and IGT timer
 // Coding: Jujstme
 // contacts: just.tribe@gmail.com
-// Version: 1.0.5 (Jun 28th, 2022)
+// Version: 1.2.1 (Jul 5th, 2022)
 
 state("SonicOrigins") {}
 
@@ -19,15 +20,16 @@ init
     // Functions needed for sigscanning
     Func<int, int, int, bool, IntPtr> pointerPath = (offset1, offset2, offset3, absolute) =>
     {
-        int tempOffset = game.ReadValue<int>(ptr + offset1);
-        IntPtr tempOffset2 = modules.First().BaseAddress + tempOffset + offset2;
+        var tempOffset = game.ReadValue<int>(ptr + offset1);
+        var tempOffset2 = modules.First().BaseAddress + tempOffset + offset2;
         if (absolute)
             return modules.First().BaseAddress + game.ReadValue<int>(tempOffset2) + offset3;
         else
             return tempOffset2 + 0x4 + game.ReadValue<int>(tempOffset2) + offset3;
     };
 
-    // Sonic CD jumptable 000000014008CB7F
+    // Sonic CD RSDK flags (RSDKv3) - Will be used for most of the addresses shared between Sonic 1, 2 and CD
+    // jumptable 000000014008CB7F
     ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CD FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  19, 10, 0x942,  false)) { Name = "SonicCDStartTrigger" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120, 26, 0,      false)) { Name = "Act" });
@@ -35,26 +37,42 @@ init
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 122,  3, 0,      false)) { Name = "Centisecs" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 123,  3, 0,      false)) { Name = "Secs" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 124,  3, 0,      false)) { Name = "Mins" });
-
-    // Sonic CD RSDK flags (RSDKv3) // print(pointerPath(0x4 * 11, 7, 0,      true).ToString("X"));
+    vars.watchers.Add(new MemoryWatcher<int>( pointerPath(0x4 *  37, 10, 0x814,  false)) { Name = "SCDTimeBonus" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7,  0x2C,  true)) { Name = "SCDLives" });
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 *  11, 7, 0x1AC,  true)) { Name = "SCDDemoMode" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7, 0x22C,  true)) { Name = "SCDMissionCondition" });
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 *  11, 7, 0x248,  true)) { Name = "SCDMissionClear" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7, 0xD8,  true)) { Name = "SCDSpecialStageReturn" });
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 *  19, 10, 0x832,  false)) { Name = "SCDSScomplete" });
 
-    // Sonic 1-2 RSDK flags (RSDKv4) // jumptable 00000001400A2461 // print(pointerPath(0x4 * 17,  7, 0,      true).ToString("X"));
+    // Dunno why these addresses, used in Sonic 3, are found in this jmp table, but it's convenient nonetheless
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120,  3, 2,      false)) { Name = "S3TimerIsRunning" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120,  3, 4,      false)) { Name = "S3Centisecs" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120,  3, 5,      false)) { Name = "S3Secs" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120,  3, 6,      false)) { Name = "S3Mins" });
+
+    // Sonic 1 and 2 RSDK flags (RSDKv4)
+    // jumptable 00000001400A2461
     ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CC FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7, 0x1A4,      true)) { Name = "S1PlayMode" }); // Becomes 5 in story mode
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 17,  7,  0x14,      true)) { Name = "S1DemoMode" }); // Also works in Sonic 2
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7,  0x5C,      true)) { Name = "S1Lives" });
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7, 0x1F8,      true)) { Name = "S1MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
+    var S1MissionCondition = pointerPath(0x4 * 17,  7, 0x1F8,      true);
+    vars.watchers.Add(new MemoryWatcher<byte>(S1MissionCondition) { Name = "S1MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 17,  7, 0x20C,      true)) { Name = "S1MissionClear" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7,  0x64,      true)) { Name = "S2Lives" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7,  0xB0,      true)) { Name = "S1SpecialStageReturn" }); // Also works for Sonic 2
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7, 0x290,      true)) { Name = "S2MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 17,  7, 0x2A4,      true)) { Name = "S2MissionClear" });
+    vars.watchers.Add(new MemoryWatcher<int> (pointerPath(0x4 * 71, 45, 0x20F8,    false)) { Name = "S1TimeBonus" });
+    vars.watchers.Add(new MemoryWatcher<int> (pointerPath(0x4 * 71, 45, 0x2100,    false)) { Name = "S2TimeBonus" });
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 71, 45, 0x16B4,    false)) { Name = "S2SScomplete" });
 
 
+    // Single sigscan to a function its only job is, apparently, timer management inside the game
+    // This variable is relative to Sonic 1, 2 and CD but its only purpose inside the autosplitter is to deal with the timer bug in Sonic CD
     ptr = scanner.Scan(new SigScanTarget(3, "8B 8C 96 ???????? 48 03 CE") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
-    vars.Ticks = pointerPath(0x4 * 1, 51, 0,      false);
-    vars.watchers.Add(new MemoryWatcher<byte>((IntPtr)vars.Ticks) { Name = "Ticks" });
+    var Ticks = pointerPath(0x4 * 1, 51, 0,      false); // Valid only for Sonic 1, 2 and CD. Not valid for S3K
 
 // General variables
     ptr = scanner.Scan(new SigScanTarget(5, "8B 47 10 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
@@ -67,15 +85,23 @@ init
     ptr = scanner.Scan(new SigScanTarget(5, "83 FB 01 89 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "S3Act" });
 
+    ptr = scanner.Scan(new SigScanTarget(5, "83 F9 01 8B 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
+    vars.watchers.Add(new MemoryWatcher<byte>(ptr) { Name = "S3AIZflag" });
+
     ptr = scanner.Scan(new SigScanTarget(7, "0F B7 04 5F") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
-    vars.watchers.Add(new MemoryWatcher<short>(ptr + 0xA) { Name = "S3XPOS" });
     vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xD4) { Name = "S3Lives" });
     vars.watchers.Add(new MemoryWatcher<byte>(ptr + 0xCC) { Name = "Sonic3SaveSlot" });
-    vars.watchers.Add(new MemoryWatcher<bool>(ptr + 0x86C0) { Name = "S3ActClearFlag" }); 
+    vars.watchers.Add(new MemoryWatcher<int>(ptr + 0x86F8) { Name = "S3TimeBonus" });
 
     ptr = scanner.Scan(new SigScanTarget(3, "4C 39 35 ???????? 74 05") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<long>(ptr) { Name = "S3HPZFlag_0" });
     vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr, 0x4)) { Name = "S3HPZFlag_1", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });
+
+    ptr = scanner.Scan(new SigScanTarget(11, "74 ?? 41 B9 ???????? 4C 8D 1D") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
+    vars.watchers.Add(new MemoryWatcher<bool>(ptr + 0x4C) { Name = "S3SScomplete" });
+
+    ptr = scanner.Scan(new SigScanTarget(1, "E8 ???????? 83 FE 05") { OnFound = (p, s, addr) => { var tempAddr = addr + 0x7 + p.ReadValue<int>(addr); return tempAddr + 0x4 + p.ReadValue<int>(tempAddr); } });
+    vars.watchers.Add(new MemoryWatcher<int>(new DeepPointer(ptr, 0x18, 0xD8, 0xA8)) { Name = "BossRushTime" });
 
 
     // Defining another pointerpath for Sonic 3's shenanigans
@@ -83,39 +109,104 @@ init
     {
         var tempOffset = game.ReadValue<int>(ptr + offset1);
         var tempOffset2 = modules.First().BaseAddress + tempOffset + 3;
-        var tempOffset3 = tempOffset2 + 6;
-        return new DeepPointer(tempOffset2 + game.ReadValue<int>(tempOffset2) + 0x4, game.ReadValue<int>(tempOffset3));
+        //var tempOffset3 = tempOffset2 + 6;
+        return new DeepPointer(tempOffset2 + game.ReadValue<int>(tempOffset2) + 0x4, game.ReadValue<int>(tempOffset2 + 6));
     };
     // jumptable 00000001400D706C
     ptr = scanner.Scan(new SigScanTarget(3, "8B 84 81 ???????? 48 03 C1 FF E0") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
-    vars.S3MissionCondition = pointerPath2(0x4 * 4);
-    vars.S3MissionClear = pointerPath2(0x4 * 9);
-    vars.watchers.Add(new MemoryWatcher<byte>(vars.S3MissionCondition) { Name = "S3MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
-    vars.watchers.Add(new MemoryWatcher<bool>(vars.S3MissionClear) { Name = "S3MissionClear" });
+    var S3MissionCondition = pointerPath2(0x4 * 4);
+    var S3MissionClear = pointerPath2(0x4 * 9);
+    vars.watchers.Add(new MemoryWatcher<byte>(S3MissionCondition) { Name = "S3MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
+    vars.watchers.Add(new MemoryWatcher<bool>(S3MissionClear) { Name = "S3MissionClear" });
+
+    ptr = scanner.Scan(new SigScanTarget(4, "4A 8B 84 32 ???????? 48 8B 08") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
+    vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr + 0x5390, 0x0, 0x28, 0xD8)) { Name = "S3SpecialStageReturn" });
+
 
     // Finished setting up the MemoryWatchers
     vars.DebugPrint("     => Done");
 
     // Custom functions
-    vars.Deref = (Func<DeepPointer, IntPtr>)((a) => { 
+    Func<DeepPointer, IntPtr> Deref = (a) => { 
         IntPtr _out = IntPtr.Zero;
         a.DerefOffsets(memory, out _out);
         return _out;
-    });
+    };
 
     // Default variables
     vars.DebugPrint("   => Setting up default state variables...");
+
+    // Variables used throughout the script
+    current.Game = 0;
+    current.IGT = TimeSpan.Zero;
+    current.StartTrigger = 0;
+    current.ActID = 0;
     current.Act = 0;
-    current.IGT = 0f;
+    current.TimerIsRunning = true;
+    current.Lives = 0;
+    current.MissionCondition = 0;
+    current.MissionClear = false;
+    current.BonusHPZ = false;
+    current.BossRushTime = TimeSpan.Zero;
     current.GameMode = 0;
-    current.S3MissionCondition = 0;
-    current.S3MissionClear = false;
+    current.TimeBonus = 0;
+    current.DemoMode = false;
+    //vars.HasTimerBug = false;
+    current.SpecialIGT = TimeSpan.Zero;
+
     vars.DebugPrint("     => Done");
+
+    // Functions used for fixing bugs in the game, because fans do what SEGAren't
+    vars.DebugPrint("   => Setting up custom functions...");
+    vars.Func.ResetS1MissionCondition = (Action)(() => game.WriteValue<byte>(S1MissionCondition, 0));
+    vars.Func.ResetS3MissionCondition = (Action)(() => game.WriteValue<byte>(Deref(S3MissionCondition), 0));
+    vars.Func.ResetS3MissionClear = (Action)(() => game.WriteValue<byte>(Deref(S3MissionClear), 0));
+    vars.Func.FixSonicCDTimer = (Action)(() => game.WriteValue<byte>(Ticks, (byte)Math.Round((vars.watchers["Centisecs"].Current / 100f) * 60)));
+    vars.DebugPrint("     => Done");
+
     vars.DebugPrint("   => Init script completed");
 }
 
 startup
 {
+    // Settings
+    // --> ID, Setting name, parent, enabled
+    dynamic[,] Settings =
+    {
+        { "start", "Auto start settings", null, true },
+            { "storystart",  "Story mode",                     "start", true },
+            { "s1start",     "Sonic 1",                        "start", true },
+            { "scdstart",    "Sonic CD",                       "start", true },
+            { "s2start",     "Sonic 2",                        "start", true },
+            { "s3start",     "Sonic 3",                        "start", true },
+            { "s1bossrush",  "Boss Rush (Sonic 1)",            "start", true },
+            { "scdbossrush", "Boss Rush (Sonic CD)",           "start", true },
+            { "s2bossrush",  "Boss Rush (Sonic 2)",            "start", true },
+            { "s3bossrush",  "Boss Rush (Sonic 3 & Knuckles)", "start", true },
+        
+        { "timing", "Timing method options", null, true },
+            // { "autosensing", "Auto-detect", "timing", true  },
+            { "rta-tb",      "Use RTA-TB instead of IGT",                     "timing", true  },
+            { "brrewind",    "Don't roll back time after dying in boss rush", "timing", false },
+            // { "igt",         "Use IGT",     "timing", false },
+        
+        { "autosplitting", "Autosplitting - Act list", null, true },
+            { "s1",  "Sonic 1",            "autosplitting", true },
+            { "scd", "Sonic CD",           "autosplitting", true },
+            { "s2",  "Sonic 2",            "autosplitting", true },
+            { "s3",  "Sonic 3 & Knuckles", "autosplitting", true },
+        
+        { "bossrush", "Boss Rush", null, true },
+            { "brs1",  "Sonic 1",            "bossrush", true },
+            { "brscd", "Sonic CD",           "bossrush", true },
+            { "brs2",  "Sonic 2",            "bossrush", true },
+            { "brs3",  "Sonic 3 & Knuckles", "bossrush", true },
+    };
+    // Autobuild the settings based on the info provided above
+    for (int s = 0; s < Settings.GetLength(0); s++) settings.Add(Settings[s, 0], Settings[s, 3], Settings[s, 1], Settings[s, 2]);
+    settings.SetToolTip("rta-tb", "If this setting is enabled, the game timer will be RTA-TB (RTA minus Time Bonus).\nIf this setting is disabled, the game timer will be IGT (in-game timer).\n\nPlease refer to the category rules on speedun.com for the correct setting to use in your run.");
+    settings.SetToolTip("brrewind", "This setting is applied only when IGT is used as the timing method.\nIf enabled, the in-game timer will not roll back after dying in boss rush,.\nIf this setting is disabled, the timer LiveSplit's timer will reflect the behaviour of the game internal Boss Rush timer.\n\nDefault: disabled.");
+
     // Array containing the name of every act
     // This is used both in the settings and for debug purposes
     var actsName = new string[][] {
@@ -128,30 +219,6 @@ startup
         new string[] { "Egg Drillster", "Egg Poison", "Egg Hammer", "Egg Claw", "Egg Scorcher Mk.II", "Egg Driller", "Eggmarine", "Egg Bouncer", "Laser Prison", "Mecha Sonic - Death Egg Robo" },
         new string[] { "Egg Scorcher Mk.III", "Egg Vortex", "Egg Drillster Mk.II", "Egg Gravitron (Sonic/Tails only)", "Egg Froster", "Egg Cannon, Egg Rocket, Big Arms", "Egg Scrambler", "Egg Hanger", "Egg Golem", "Egg Inferno (Sonic/Tails only)", "Giant Eggman Robo (Sonic/Tails only)", "Mecha Sonic Mk.II (Knuckles only)" },
     };
-
-    // Settings
-    settings.Add("start", true, "Autostart options");
-    settings.Add("storystart", true, "Story Mode", "start");
-    settings.Add("s1start", true, "Sonic 1", "start");
-    settings.Add("scdstart", true, "Sonic CD", "start");
-    settings.Add("s2start", true, "Sonic 2", "start");
-    settings.Add("s3start", true, "Sonic 3 & Knuckles", "start");
-    settings.Add("s1bossrush", true, "Boss Rush (Sonic 1)", "start");
-    settings.Add("scdbossrush", true, "Boss Rush (Sonic CD)", "start");
-    settings.Add("s2bossrush", true, "Boss Rush (Sonic 2)", "start");
-    settings.Add("s3bossrush", true, "Boss Rush (Sonic 3 & Knuckles)", "start");
-    settings.Add("fixes", true, "Game Fixes");
-    settings.Add("timerbug", false, "Fix Sonic CD timer bug", "fixes");
-    settings.Add("autosplitting", true, "Autosplitting - Act list");
-    settings.Add("s1", true, "Sonic 1", "autosplitting");
-    settings.Add("scd", true, "Sonic CD", "autosplitting");
-    settings.Add("s2", true, "Sonic 2", "autosplitting");
-    settings.Add("s3", true, "Sonic 3 & Knuckles", "autosplitting");
-    settings.Add("bossrush", true, "Boss Rush");
-    settings.Add("brs1", true, "Sonic 1", "bossrush");
-    settings.Add("brscd", true, "Sonic CD", "bossrush");
-    settings.Add("brs2", true, "Sonic 2", "bossrush");
-    settings.Add("brs3", true, "Sonic 3 & Knuckles", "bossrush");
 
     // Adding the acts to the autosplitting settings
     int i = 0;
@@ -236,7 +303,7 @@ startup
         { 2019, 64 }, { 2020, 65 }, // Marble Garden Act 1, 2
         { 2021, 66 }, { 2022, 67 }, // Carnival Night Act 1, 2
         { 2023, 68 }, { 2024, 69 }, // Ice Cap Act 1, 2
-        { 2025, 70 }, { 2026, 71 }, // Launch Base Act 1, 2
+        { 2025, 70 }, { 2026, 71 }, { 2004, 71 }, // Launch Base Act 1, 2
         { 2027, 72 }, { 2028, 73 }, // Mushroom Hill Act 1, 2
         { 2029, 74 }, { 2030, 75 }, // Flying Battery Act 1, 2
         { 2031, 76 }, { 2032, 77 }, // Sandopolis Act 1, 2
@@ -285,9 +352,30 @@ startup
         { 2084, 119 },  // VS Mecha Sonic Mk.II (Knuckles)
     };
 
+    vars.SpecialStagesIDs = new List<int>{
+        26, 27, 28, 29, 30, 31, 32,     // Sonic 1
+        3083, 3084, 3085, 3086, 3087, 3088, 3089,     // Sonic CD
+        1028, 1029, 1030, 1031, 1032, 1033, 1034, 1035, // Sonic 2
+        2085, 2086, 2087, 2088, 2089, 2090, 2091, 2092, 2093, 2094, 2095, 2096, 2097, 2098, 2099, 2100, // Sonic 3
+        2052, 2053, 2054,   // Sonic 3 Bonus rounds
+    };
+
+    // Custom functions
+    vars.Func = new ExpandoObject();
+    vars.Func.ResetIGTBuffers = (Action)(() => { vars.AccumulatedIGT = TimeSpan.Zero; vars.BufferIGT = TimeSpan.Zero; });
+
+    // Default variables
+    vars.UpdateIGT = true;
+    vars.BufferIGT = TimeSpan.Zero;
+    vars.AccumulatedIGT = TimeSpan.Zero;
+    vars.TimeBonusStartValue = 0;
+    vars.RTATB = new Stopwatch();
+
     // Debug functions
     var debug = true; // Easy flag to quickly enable and disable debug outputs. When they're not needed anymore all it takes is to set this to false.
-    vars.DebugPrint = (Action<string>)((string obj) => { if (debug) print("[Sonic Origins] " + obj); });
+    vars.DebugPrint = (Action<string>)((obj) => { if (debug) print("[Sonic Origins] " + obj); });
+    vars.Start = (Func<string, bool>)((obj) => { vars.DebugPrint("   => Run started: " + obj); return true; });
+    vars.Split = (Func<string, bool>)((obj) => { vars.DebugPrint("   => Run split - previously on: " + obj); return true; });
 }
 
 update
@@ -295,97 +383,268 @@ update
     // Update the main watchers variable
     vars.watchers.UpdateAll(game);
 
-    // Define current Act
-    int cAct;
-    switch ((byte)vars.watchers["Game"].Current)
+    // Define current game, as almost every other variable that needs to be picked depends on this
+    current.Game = vars.watchers["Game"].Current;
+
+    // Default ActID. Its memory address stays the same across all the 4 games
+    current.ActID = vars.watchers["S3Act"].Current + current.Game * 1000;
+
+    // Calculate time at the end of each battle in Boss Rush. This helps with the timing
+    current.BossRushTime = TimeSpan.FromMilliseconds(vars.watchers["BossRushTime"].Current * 10);
+
+    // Pick the correct values from the respective game
+    switch ((byte)current.Game)
     {
-        default:
-            cAct = vars.watchers["Act"].Current + vars.watchers["Game"].Current * 1000;
+        case 0: // Sonic 1
+            current.StartTrigger = vars.watchers["Sonic12StartTrigger"].Current;
+            current.TimerIsRunning = vars.watchers["TimerIsRunning"].Current;
+            current.IGT = TimeSpan.FromSeconds(vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100d);
+            current.Lives = vars.watchers["S1Lives"].Current;
+            current.TimeBonus = vars.watchers["S1TimeBonus"].Current;
+            current.MissionCondition = vars.watchers["S1MissionCondition"].Current;
+            current.MissionClear = vars.watchers["S1MissionClear"].Current;
+            current.DemoMode = vars.watchers["S1DemoMode"].Current;
+            current.SpecialStageReturn = vars.watchers["S1SpecialStageReturn"].Current + 5;
+            current.BonusHPZ = false;
             break;
-        case 2: // Sonic 3
-            // If the flags for HPZ are set (which implies we are either in the emerald altair or at the results tally after a special stage),
-            // we need to prevent the script from changing the current act.
-            if (vars.watchers["S3Act"].Current == 36 && (vars.watchers["S3HPZFlag_0"].Current == 0 || vars.watchers["S3HPZFlag_1"].Current != 0))
-            {
-                cAct = -1;
-            } else {
-                cAct = vars.watchers["S3Act"].Current + vars.watchers["Game"].Current * 1000;
-            }
+        case 1: // Sonic 2
+            current.StartTrigger = vars.watchers["Sonic12StartTrigger"].Current;
+            current.TimerIsRunning = vars.watchers["TimerIsRunning"].Current;
+            current.IGT = TimeSpan.FromSeconds(vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100d);
+            current.Lives = vars.watchers["S2Lives"].Current;
+            current.TimeBonus = vars.watchers["S2TimeBonus"].Current;
+            current.MissionCondition = vars.watchers["S2MissionCondition"].Current;
+            current.MissionClear = vars.watchers["S2MissionClear"].Current;
+            current.DemoMode = vars.watchers["S1DemoMode"].Current;
+            current.SpecialStageReturn = vars.watchers["S1SpecialStageReturn"].Current + 7 + current.Game * 1000;
+            current.BonusHPZ = false;
+            break;
+        case 2: // Sonic 3 & Knuckles
+            current.StartTrigger = vars.watchers["Act"].Current;
+            current.TimerIsRunning = vars.watchers["S3TimerIsRunning"].Current == 1;
+            current.IGT = TimeSpan.FromSeconds(vars.watchers["S3Mins"].Current * 60 + vars.watchers["S3Secs"].Current + vars.watchers["S3Centisecs"].Current / 100d);
+            current.Lives = vars.watchers["S3Lives"].Current;
+            current.TimeBonus = vars.watchers["S3TimeBonus"].Current;
+            current.MissionCondition = vars.watchers["S3MissionCondition"].Current;
+            current.MissionClear = vars.watchers["S3MissionClear"].Current;
+            current.DemoMode = false;
+            current.SpecialStageReturn = vars.watchers["S3SpecialStageReturn"].Current + current.Game * 1000;
+            current.BonusHPZ = vars.watchers["S3HPZFlag_0"].Current == 0 || vars.watchers["S3HPZFlag_1"].Current != 0;
+            break;
+        case 3: // Sonic CD
+            current.StartTrigger = vars.watchers["SonicCDStartTrigger"].Current;
+            current.TimerIsRunning = vars.watchers["TimerIsRunning"].Current;
+            current.IGT = TimeSpan.FromSeconds(vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100d);
+            // fix for sonic cd buggy timer
+            if (current.IGT < old.IGT) vars.Func.FixSonicCDTimer();
+            //if (current.IGT < old.IGT) game.WriteValue<byte>((IntPtr)vars.Ticks, (byte)Math.Round((vars.watchers["Centisecs"].Current / 100f) * 60));
+            current.Lives = vars.watchers["SCDLives"].Current;
+            current.TimeBonus = vars.watchers["SCDTimeBonus"].Current;
+            current.MissionCondition = vars.watchers["SCDMissionCondition"].Current;
+            current.MissionClear = vars.watchers["SCDMissionClear"].Current;
+            current.DemoMode = vars.watchers["SCDDemoMode"].Current;
+            current.SpecialStageReturn = vars.watchers["SCDSpecialStageReturn"].Current + 9 + current.Game * 1000;
+            current.BonusHPZ = false;
             break;
     }
-    if (vars.Acts.ContainsKey(cAct))
-        current.Act = vars.Acts[cAct];
+
+    //
+    // IGT logic
+    //
+    // If updating the IGT has been disabled (eg. in boss rush mode) return to the previous value
+    if (!vars.UpdateIGT)
+        current.IGT = old.IGT;
+
+    // In a variety of conditions related to the TimerIsRunning variable, don't update the IGT (and thus return to the previous value)
+    // It's a very ugly hack made to cope with the timer losing its values in memory when entering a special stage
+    switch ((byte)current.Game)
+    {
+        case 0: case 1: if (!old.TimerIsRunning || !current.TimerIsRunning) current.IGT = old.IGT; break;
+        case 3: if (!old.TimerIsRunning && !current.TimerIsRunning) current.IGT = old.IGT; break;
+        case 2: if (!current.TimerIsRunning) current.IGT = old.IGT; break;
+    }
+
+    // If in demo mode, IGT must be 0 regardless of the game
+    if (current.DemoMode || old.DemoMode)
+        current.IGT = TimeSpan.Zero;
+
+    // If in the main menu for each of the 4 games, IGT must be 0
+    if (current.ActID == 0 || current.ActID == 1000 || current.ActID == 2000 || current.ActID == 2002 || current.ActID == 3000)
+        current.IGT = TimeSpan.Zero;
+
+    // Check if we are in a special stage
+    current.IsInSpecialStage = vars.SpecialStagesIDs.Contains(current.ActID) || (current.ActID == 2036 && current.BonusHPZ);
+        
+    // Define current Act
+    if (current.IsInSpecialStage)
+        current.Act = vars.Acts[current.SpecialStageReturn];
+    else if (vars.Acts.ContainsKey(current.ActID))
+        current.Act = vars.Acts[current.ActID];
+/*
+    // Check if we are in a special stage
+    if (current.Game == vars.Game.Sonic3)
+        current.IsInSpecialStage = vars.SpecialStagesIDs.Contains(current.ActID) || (current.ActID == 2036 && vars.watchers["S3HPZFlag_1"].Current == 2);
+    else
+        current.IsInSpecialStage = vars.SpecialStagesIDs.Contains(current.ActID);
+        
+    // Define current Act
+    if (current.IsInSpecialStage || (current.ActID == 2036 && current.BonusHPZ))
+    {
+        current.Act = vars.Acts[current.SpecialStageReturn];
+    } else if (vars.Acts.ContainsKey(current.ActID)) {
+        current.Act = vars.Acts[current.ActID];
+    }
+*/
+
+    // Special condition for because AIZ1 and AIZ2 share the same map
+    if (current.Act == 61)
+    {
+        if (vars.watchers["S3AIZflag"].Current == 0)
+            current.Act -= 1;
+        else if (vars.watchers["S3AIZflag"].Current > 1)
+            current.Act = old.Act;
+    }
 
     // Define game mode
     // 0 = normal; 1 = boss rush
-    if (current.Act < 85 || (current.Act == 85 && vars.watchers["Game"].Current == vars.Game.Sonic1))
-        current.GameMode = 0;
-    else
+    if ( (current.Act > 85 && current.Act <= 119) || (current.Act == 85 && current.Game != vars.Game.Sonic3) )
         current.GameMode = 1;
+    else
+        current.GameMode = 0;
 
-    // Fixing timer bug in Sonic CD
-    if (settings["timerbug"] && vars.watchers["Game"].Current == vars.Game.SonicCD)
+    // In special stages we don't want to run the normal timer
+    if (current.IsInSpecialStage)
     {
-        if (vars.watchers["TimerIsRunning"].Current || vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100f != 0f)
-            current.IGT = vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100f;
-        if (old.IGT > current.IGT)
+        current.IGT = old.IGT;
+
+        switch((byte)current.Game)
         {
-            game.WriteValue<byte>((IntPtr)vars.Ticks, (byte)Math.Round((vars.watchers["Centisecs"].Current / 100f) * 60));
+            case 0:
+                current.SpecialIGT = TimeSpan.FromSeconds(vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100d);
+                break;
+            case 1:
+                current.SpecialIGT = TimeSpan.FromSeconds(vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100d);
+                if (vars.watchers["S2SScomplete"].Current) current.SpecialIGT = old.SpecialIGT;
+                break;
+            case 2:
+                current.SpecialIGT = TimeSpan.FromSeconds(vars.watchers["S3Mins"].Current * 60 + vars.watchers["S3Secs"].Current + vars.watchers["S3Centisecs"].Current / 100d);
+                if (current.ActID != 2052 && current.ActID != 2053 && current.ActID != 2054 && vars.watchers["S3SScomplete"].Current) current.SpecialIGT = old.SpecialIGT;
+                if (!current.TimerIsRunning) current.SpecialIGT = old.SpecialIGT;
+                break;
+            case 3:
+                current.SpecialIGT = TimeSpan.FromSeconds(vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100d);
+                if (vars.watchers["SCDSScomplete"].Current) current.SpecialIGT = old.SpecialIGT;
+                break;
         }
+    } else {
+        current.SpecialIGT = TimeSpan.Zero;
     }
+
+    // Reset the buffer IGT variables when the timer is stopped
+    if (timer.CurrentPhase == TimerPhase.NotRunning)
+    {
+        vars.Func.ResetIGTBuffers();
+        current.IGT = TimeSpan.Zero;
+        current.SpecialIGT = TimeSpan.Zero;
+    }
+    if (current.IGT < old.IGT && current.GameMode != 1)
+    {
+        vars.AccumulatedIGT += old.IGT - vars.BufferIGT;
+        vars.BufferIGT = current.IGT;
+    }
+
+    // Boss rush mode timer
+    // If executed, the timer will not revert after dying in a boss rush act
+    if (settings["brrewind"] && current.IGT < old.IGT && current.GameMode == 1 && current.MissionCondition == 0)
+    {
+        vars.AccumulatedIGT += old.IGT - vars.BufferIGT;
+        vars.BufferIGT = current.IGT;
+    }
+    if (current.SpecialIGT < old.SpecialIGT)
+        vars.AccumulatedIGT += old.SpecialIGT;
+
+    // Time Bonus start value
+    if (old.TimeBonus == 0 && old.TimeBonus != current.TimeBonus)
+        vars.TimeBonusStartValue = current.TimeBonus;
+    else if (current.TimeBonus == 0)
+        vars.TimeBonusStartValue = 0;
+
+    // Managing RTA-TB timer on a dedicated stopwatch
+    switch (timer.CurrentPhase)
+    {
+        case TimerPhase.NotRunning:
+            vars.RTATB.Reset();
+            break;
+        case TimerPhase.Running:
+            if (vars.RTATB.IsRunning && vars.TimeBonusStartValue != 0 && current.TimeBonus != vars.TimeBonusStartValue) vars.RTATB.Stop();
+            if (!vars.RTATB.IsRunning && !(vars.TimeBonusStartValue != 0 && current.TimeBonus != vars.TimeBonusStartValue)) vars.RTATB.Start();
+            break;
+        case TimerPhase.Paused:
+        case TimerPhase.Ended:
+            if (vars.RTATB.IsRunning) vars.RTATB.Stop();
+            break;
+    }
+
+    // Whenever you beat a boss in boss rush mode, the IGT picked up by LiveSplit needs to be frozen
+    //if (current.GameMode == 1 && old.BossRushTime != current.BossRushTime && current.IGT > TimeSpan.FromSeconds(1)) { vars.UpdateIGT = false; current.IGT = current.BossRushTime; }
+    if (current.GameMode == 1 && current.MissionCondition > 0 && old.MissionCondition == 0)
+    {
+        vars.UpdateIGT = false;
+        vars.AccumulatedIGT += current.BossRushTime;
+        current.IGT = TimeSpan.Zero;
+    }
+    if (!vars.UpdateIGT && ((current.ActID != old.ActID) || current.GameMode != 1))
+        vars.UpdateIGT = true;
 
     // Fix for Sonic 3 mission flag shenanigans
-    if (vars.watchers["Game"].Current == vars.Game.Sonic3)
+    if (current.Game == vars.Game.Sonic3 && current.GameMode != 0)
     {
-        current.S3MissionCondition = vars.watchers["S3MissionCondition"].Current;
-        current.S3MissionClear = vars.watchers["S3MissionClear"].Current;
-        if (current.S3MissionCondition > 0) game.WriteValue<byte>((IntPtr)vars.Deref(vars.S3MissionCondition), 0);
-        if (current.S3MissionClear) game.WriteValue<byte>((IntPtr)vars.Deref(vars.S3MissionClear), 0);
+        if (current.MissionCondition > 0) vars.Func.ResetS3MissionCondition();
+        if (current.MissionClear) vars.Func.ResetS3MissionClear();
     }
+
+    // Fix for Sonic 1 mission flag shenanigans
+    if (current.Game == vars.Game.Sonic1 && current.GameMode != 0 && current.MissionCondition > 0)
+        vars.Func.ResetS1MissionCondition();
 }
 
 start
 {
     // Story mode
-    if (settings["storystart"] && vars.watchers["S1PlayMode"].Current == 5 && vars.watchers["Act"].Old == 0 && vars.watchers["Act"].Current == 6)
-        { vars.DebugPrint("   => Run started: Story mode"); return true; }
+    if (settings["storystart"] && vars.watchers["S1PlayMode"].Current == 5 && old.ActID == 0 && current.ActID == 6)
+        return vars.Start("Story Mode");
 
     // Sonic 1 boss rush
-    if (settings["s1bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic1 && (vars.watchers["Act"].Old != 36 && vars.watchers["Act"].Current == 36) || (vars.watchers["Act"].Current == 36 && vars.watchers["S1Lives"].Old != 3 && vars.watchers["S1Lives"].Current == 3))
-        { vars.DebugPrint("   => Run started: Sonic 1 Boss Rush"); return true; }
+    if (settings["s1bossrush"] && current.ActID == 36 && (old.ActID != 36 || (old.Lives != 3 && current.Lives == 3) ) )
+        return vars.Start("Sonic 1 - Boss Rush");
 
     // Sonic CD boss rush
-    if (settings["scdbossrush"] && vars.watchers["Game"].Current == vars.Game.SonicCD && (vars.watchers["Act"].Old != 111 && vars.watchers["Act"].Current == 111) || (vars.watchers["Act"].Current == 111 && vars.watchers["SCDLives"].Old != 3 && vars.watchers["SCDLives"].Current == 3))
-        { vars.DebugPrint("   => Run started: Sonic CD Boss Rush"); return true; }
+    if (settings["scdbossrush"] && current.ActID == 3111 && (old.ActID != 3111 || (old.Lives != 3 && current.Lives == 3) ) )
+        return vars.Start("Sonic CD - Boss Rush");
 
     // Sonic 2 boss rush
-    if (settings["s2bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic2 && (vars.watchers["Act"].Old != 63 && vars.watchers["Act"].Current == 63) || (vars.watchers["Act"].Current == 63 && vars.watchers["S2Lives"].Old != 3 && vars.watchers["S2Lives"].Current == 3))
-        { vars.DebugPrint("   => Run started: Sonic 2 Boss Rush"); return true; }
+    if (settings["s2bossrush"] && current.ActID == 1063 && (old.ActID != 1063 || (old.Lives != 3 && current.Lives == 3) ) )
+        return vars.Start("Sonic 2 - Boss Rush");
 
     // Sonic 3 boss rush
-    if (settings["s3bossrush"] && vars.watchers["Game"].Current == vars.Game.Sonic3 && (vars.watchers["Act"].Old != 70 && vars.watchers["Act"].Current == 70) || (vars.watchers["Act"].Current == 70 && vars.watchers["S3Lives"].Old != 3 && vars.watchers["S3Lives"].Current == 3))
-        { vars.DebugPrint("   => Run started: Sonic 3 Boss Rush"); return true; }
+    if (settings["s3bossrush"] && current.ActID == 2070 && (old.ActID != 2070 || (old.Lives != 3 && current.Lives == 3) ) )
+        return vars.Start("Sonic 3 & Knuckles - Boss Rush");
 
-    // Single games
-    switch ((byte)vars.watchers["Game"].Current)
-    {
-        case 0: // Sonic1
-            if (settings["s1start"] && vars.watchers["Sonic12StartTrigger"].Old == 6 && vars.watchers["Sonic12StartTrigger"].Current == 1)
-                { vars.DebugPrint("   => Run started: Sonic 1"); return true; }
-            break;
-        case 3: // Sonic CD
-            if (settings["scdstart"] && vars.watchers["SonicCDStartTrigger"].Old == 11 && vars.watchers["SonicCDStartTrigger"].Current == 2)
-                { vars.DebugPrint("   => Run started: Sonic CD"); return true; }
-            break;
-        case 1: // Sonic 2
-            if (settings["s2start"] && vars.watchers["Sonic12StartTrigger"].Old == 8 && vars.watchers["Sonic12StartTrigger"].Current == 9)
-                { vars.DebugPrint("   => Run started: Sonic 2"); return true; }
-            break;
-        case 2: // Sonic 3
-            if (settings["s3start"] && vars.watchers["Act"].Old == 2 && vars.watchers["Act"].Current == 15 && vars.watchers["Sonic3SaveSlot"].Current >= 65 && vars.watchers["Sonic3SaveSlot"].Current <= 73)
-                { vars.DebugPrint("   => Run started: Sonic 3 & Knuckles"); return true; }
-            break;
-    }
+    // Sonic 1 single game
+    if (settings["s1start"] && old.StartTrigger == 6 && current.StartTrigger == 1)
+        return vars.Start("Sonic 1");
+
+    // Sonic CD single game
+    if (settings["scdstart"] && old.StartTrigger == 11 && current.StartTrigger == 2)
+        return vars.Start("Sonic CD");
+    
+    // Sonic 2 single game
+    if (settings["s2start"] && old.StartTrigger == 8 && current.StartTrigger == 9)
+        return vars.Start("Sonic 2");
+    
+    // Sonic 3 single game
+    if (settings["s3start"] && old.StartTrigger == 2 && current.StartTrigger == 15)
+        return vars.Start("Sonic 3");
 }
 
 split
@@ -397,77 +656,54 @@ split
     // 0 = stages; 1 = boss rush
 
     // Splitting in Boss rush
-    if (current.GameMode == 1)
-    {
-        switch ((byte)vars.watchers["Game"].Current)
-        {
-            case 0: // Sonic 1
-                if (settings["90"] && old.Act == 90 && vars.watchers["S1MissionCondition"].Old == 0 && vars.watchers["S1MissionCondition"].Current == 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
-                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
-                break;
-            case 1: // Sonic 2
-                if (settings["107"] && old.Act == 107 && vars.watchers["S2MissionCondition"].Old == 0 && vars.watchers["S2MissionCondition"].Current == 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
-                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
-                break;
-            case 2: // Sonic 3
-                switch ((byte)current.Act)
-                {
-                    // Act 112 (Egg Froster) can be accessed even from Act 110 (Egg Drillster Mk.II), especially with Knuckles as he skips Egg Gravitron
-                    case 112:
-                        if (settings[old.Act.ToString()] && (old.Act == 110 || old.Act == 111)) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
-                        break;
-                    // Act 119 (Mecha Sonic Mk.II) is a Knuckles-exclusive boss, and will be accessed directly from Act 116 (Egg Golem)
-                    // It's also the final boss for Knuckles, so we need to put the last boss condition here
-                    case 119:
-                        if (settings["116"] && old.Act == 116) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
-                        if (settings["119"] && old.Act == 119 && current.S3MissionCondition == 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
-                        break;
-                    default:
-                        if (settings["118"] && old.Act == 118 && current.S3MissionCondition == 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
-                        if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
-                        break;
-                }
-                break;
-            case 3: // Sonic CD
-                if (settings["97"] && old.Act == 97 && vars.watchers["SCDMissionCondition"].Old == 0 && vars.watchers["SCDMissionCondition"].Current == 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
-                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous boss was: " + vars.ActsName[old.Act]); return true; }
-                break;
-        }
-    }
+    if (current.GameMode == 1 && settings[old.Act.ToString()] && old.MissionCondition == 0 && current.MissionCondition > 0)
+        return vars.Split(vars.ActsName[old.Act]);
 
     // Splitting in normal acts
     if (current.GameMode == 0)
     {
-        switch ((byte)vars.watchers["Game"].Current)
+        switch ((byte)current.Act)
         {
-            default:
-                if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[old.Act]); return true; }
+            // Act 80 (Hidden Palace) can be accessed from any previous level, thanks to the wrong warp
+            case 80:
+                if (settings[old.Act.ToString()] && old.Act < current.Act)
+                    return vars.Split(vars.ActsName[old.Act]);
                 break;
-            // Split management in Sonic 3 needs special cases
-            case 2:
-                switch ((byte)current.Act)
-                {
-                    // Act 61 Angel Island needs special care
-                    case 61:
-                        if (settings["60"] && vars.watchers["S3ActClearFlag"].Old && !vars.watchers["S3ActClearFlag"].Current && vars.watchers["S3XPOS"].Current < 4700) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[60]); return true; }
-                        break;
-                    // Act 72 (Mushroom Hill Act 1) needs to be reached after the falling Death Egg cutscene
-                    case 72:
-                        if (settings[old.Act.ToString()] && vars.watchers["S3Act"].Old == 4) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[71]); return true; }
-                        break;
-                    // Act 80 (Hidden Palace) can be accessed from any previous level, thanks to the wrong warp
-                    case 80:
-                        if (settings[old.Act.ToString()] && old.Act >= 72 && old.Act < current.Act) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[old.Act]); return true; }
-                        break;
-                    // Act 85 (credits) can be reached from Sky Sanctuary (Knuckles' ending), DEZ2 or Doomsday Zone
-                    case 85:
-                        if (settings[old.Act.ToString()] && (old.Act == 81 || old.Act == 83 || old.Act == 84)) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[old.Act]); return true; }
-                        break;
-                    default:
-                        if (settings[old.Act.ToString()] && current.Act == old.Act + 1) { vars.DebugPrint("   => Run split - previous act was: " + vars.ActsName[old.Act]); return true; }
-                        break;
-                }
-            break;
+            // Act 81 (Sky Sanctuary) can technically be reached only from HPZ, but, because of a workaround used earlier in the script
+            // we need to allow splitting from any previous level
+            case 81:
+                if (settings[(current.Act - 1).ToString()] && old.Act < current.Act)
+                    return vars.Split(vars.ActsName[current.Act - 1]);
+                break;
+            // Act 85 (Sonic 3 credits) can be reached from either Sky Sanctuary (Knuckles' version), Death Egg 2 or Doomsday Zone
+            case 85:
+                if (settings[old.Act.ToString()] && (old.Act == 81 || old.Act == 83 || old.Act == 84))
+                    return vars.Split(vars.ActsName[old.Act]);
+                break;
+            // The default behaviour is to split whenver you progress from a stage to the next one
+            // In that case, the stage counte rincreased by 1
+            default:
+                if (settings[old.Act.ToString()] && current.Act == old.Act + 1)
+                    return vars.Split(vars.ActsName[old.Act]);
+                break;
         }
     }
+}
+
+isLoading
+{
+    return true;
+}
+
+gameTime
+{
+    if (settings["rta-tb"])
+        return vars.RTATB.Elapsed;
+    else
+        return current.IGT + vars.AccumulatedIGT - vars.BufferIGT + current.SpecialIGT;
+}
+
+onStart
+{
+    if (!vars.RTATB.IsRunning) vars.RTATB.Start();
 }
