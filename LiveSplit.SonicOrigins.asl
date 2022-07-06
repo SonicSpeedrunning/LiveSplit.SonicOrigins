@@ -2,7 +2,7 @@
 // Autosplitter and IGT timer
 // Coding: Jujstme
 // contacts: just.tribe@gmail.com
-// Version: 1.2.1 (Jul 5th, 2022)
+// Version: 1.2.2 (Jul 6th, 2022)
 
 state("SonicOrigins") {}
 
@@ -67,7 +67,8 @@ init
     vars.watchers.Add(new MemoryWatcher<int> (pointerPath(0x4 * 71, 45, 0x20F8,    false)) { Name = "S1TimeBonus" });
     vars.watchers.Add(new MemoryWatcher<int> (pointerPath(0x4 * 71, 45, 0x2100,    false)) { Name = "S2TimeBonus" });
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 71, 45, 0x16B4,    false)) { Name = "S2SScomplete" });
-
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 71, 45, 0x2114,    false)) { Name = "S2ContinueBonus" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 71, 45, 0x21A4,    false)) { Name = "S2ScoreTally" });
 
     // Single sigscan to a function its only job is, apparently, timer management inside the game
     // This variable is relative to Sonic 1, 2 and CD but its only purpose inside the autosplitter is to deal with the timer bug in Sonic CD
@@ -153,6 +154,8 @@ init
     current.DemoMode = false;
     //vars.HasTimerBug = false;
     current.SpecialIGT = TimeSpan.Zero;
+    current.IsInTimeBonus = false;
+    current.IsInContinueBonus = false;
 
     vars.DebugPrint("     => Done");
 
@@ -187,6 +190,7 @@ startup
         { "timing", "Timing method options", null, true },
             // { "autosensing", "Auto-detect", "timing", true  },
             { "rta-tb",      "Use RTA-TB instead of IGT",                     "timing", true  },
+                { "continuebonus", "Use RTA-TBC (Sonic 2 exclusive)", "rta-tb", true },
             { "brrewind",    "Don't roll back time after dying in boss rush", "timing", false },
             // { "igt",         "Use IGT",     "timing", false },
         
@@ -206,6 +210,7 @@ startup
     for (int s = 0; s < Settings.GetLength(0); s++) settings.Add(Settings[s, 0], Settings[s, 3], Settings[s, 1], Settings[s, 2]);
     settings.SetToolTip("rta-tb", "If this setting is enabled, the game timer will be RTA-TB (RTA minus Time Bonus).\nIf this setting is disabled, the game timer will be IGT (in-game timer).\n\nPlease refer to the category rules on speedun.com for the correct setting to use in your run.");
     settings.SetToolTip("brrewind", "This setting is applied only when IGT is used as the timing method.\nIf enabled, the in-game timer will not roll back after dying in boss rush,.\nIf this setting is disabled, the timer LiveSplit's timer will reflect the behaviour of the game internal Boss Rush timer.\n\nDefault: disabled.");
+    settings.SetToolTip("continuebonus", "This setting has no effect when RTA-TB is disabled.\n\nIf enabled, the in-game timer will pause when displaying the continue bonus at the end of\nan act in Sonic 2.\n\nPlease refer to the category rules on speedun.com for the correct setting to use in your run.");
 
     // Array containing the name of every act
     // This is used both in the settings and for debug purposes
@@ -370,9 +375,10 @@ startup
     vars.AccumulatedIGT = TimeSpan.Zero;
     vars.TimeBonusStartValue = 0;
     vars.RTATB = new Stopwatch();
+    vars.CBtimer = new Stopwatch();
 
     // Debug functions
-    var debug = true; // Easy flag to quickly enable and disable debug outputs. When they're not needed anymore all it takes is to set this to false.
+    var debug = false; // Easy flag to quickly enable and disable debug outputs. When they're not needed anymore all it takes is to set this to false.
     vars.DebugPrint = (Action<string>)((obj) => { if (debug) print("[Sonic Origins] " + obj); });
     vars.Start = (Func<string, bool>)((obj) => { vars.DebugPrint("   => Run started: " + obj); return true; });
     vars.Split = (Func<string, bool>)((obj) => { vars.DebugPrint("   => Run split - previously on: " + obj); return true; });
@@ -406,6 +412,7 @@ update
             current.DemoMode = vars.watchers["S1DemoMode"].Current;
             current.SpecialStageReturn = vars.watchers["S1SpecialStageReturn"].Current + 5;
             current.BonusHPZ = false;
+            current.IsInContinueBonus = false;
             break;
         case 1: // Sonic 2
             current.StartTrigger = vars.watchers["Sonic12StartTrigger"].Current;
@@ -418,6 +425,7 @@ update
             current.DemoMode = vars.watchers["S1DemoMode"].Current;
             current.SpecialStageReturn = vars.watchers["S1SpecialStageReturn"].Current + 7 + current.Game * 1000;
             current.BonusHPZ = false;
+            current.IsInContinueBonus = vars.watchers["S2ContinueBonus"].Current && vars.watchers["S2ScoreTally"].Current == 4;
             break;
         case 2: // Sonic 3 & Knuckles
             current.StartTrigger = vars.watchers["Act"].Current;
@@ -430,6 +438,7 @@ update
             current.DemoMode = false;
             current.SpecialStageReturn = vars.watchers["S3SpecialStageReturn"].Current + current.Game * 1000;
             current.BonusHPZ = vars.watchers["S3HPZFlag_0"].Current == 0 || vars.watchers["S3HPZFlag_1"].Current != 0;
+            current.IsInContinueBonus = false;
             break;
         case 3: // Sonic CD
             current.StartTrigger = vars.watchers["SonicCDStartTrigger"].Current;
@@ -445,6 +454,7 @@ update
             current.DemoMode = vars.watchers["SCDDemoMode"].Current;
             current.SpecialStageReturn = vars.watchers["SCDSpecialStageReturn"].Current + 9 + current.Game * 1000;
             current.BonusHPZ = false;
+            current.IsInContinueBonus = false;
             break;
     }
 
@@ -476,25 +486,14 @@ update
     current.IsInSpecialStage = vars.SpecialStagesIDs.Contains(current.ActID) || (current.ActID == 2036 && current.BonusHPZ);
         
     // Define current Act
+    // Sonic 2 has a bug with this so we're gonna exclude that game for this statement
     if (current.IsInSpecialStage)
-        current.Act = vars.Acts[current.SpecialStageReturn];
-    else if (vars.Acts.ContainsKey(current.ActID))
-        current.Act = vars.Acts[current.ActID];
-/*
-    // Check if we are in a special stage
-    if (current.Game == vars.Game.Sonic3)
-        current.IsInSpecialStage = vars.SpecialStagesIDs.Contains(current.ActID) || (current.ActID == 2036 && vars.watchers["S3HPZFlag_1"].Current == 2);
-    else
-        current.IsInSpecialStage = vars.SpecialStagesIDs.Contains(current.ActID);
-        
-    // Define current Act
-    if (current.IsInSpecialStage || (current.ActID == 2036 && current.BonusHPZ))
     {
-        current.Act = vars.Acts[current.SpecialStageReturn];
+        if (current.Game != vars.Game.Sonic2)
+            current.Act = vars.Acts[current.SpecialStageReturn];
     } else if (vars.Acts.ContainsKey(current.ActID)) {
         current.Act = vars.Acts[current.ActID];
     }
-*/
 
     // Special condition for because AIZ1 and AIZ2 share the same map
     if (current.Act == 61)
@@ -563,25 +562,32 @@ update
     if (current.SpecialIGT < old.SpecialIGT)
         vars.AccumulatedIGT += old.SpecialIGT;
 
-    // Time Bonus start value
+    // Time Bonus
     if (old.TimeBonus == 0 && old.TimeBonus != current.TimeBonus)
         vars.TimeBonusStartValue = current.TimeBonus;
     else if (current.TimeBonus == 0)
         vars.TimeBonusStartValue = 0;
+    current.IsInTimeBonus = vars.TimeBonusStartValue != 0 && current.TimeBonus != vars.TimeBonusStartValue;
 
-    // Managing RTA-TB timer on a dedicated stopwatch
+    // Continue bonus is used only in Sonic 2
+
+    // Managing RTA-TB and ContinuaBonus timers on a dedicated stopwatch
     switch (timer.CurrentPhase)
     {
         case TimerPhase.NotRunning:
             vars.RTATB.Reset();
+            vars.CBtimer.Reset();
             break;
         case TimerPhase.Running:
-            if (vars.RTATB.IsRunning && vars.TimeBonusStartValue != 0 && current.TimeBonus != vars.TimeBonusStartValue) vars.RTATB.Stop();
-            if (!vars.RTATB.IsRunning && !(vars.TimeBonusStartValue != 0 && current.TimeBonus != vars.TimeBonusStartValue)) vars.RTATB.Start();
+            if (vars.RTATB.IsRunning && current.IsInTimeBonus) vars.RTATB.Stop();
+            if (!vars.RTATB.IsRunning && !current.IsInTimeBonus) vars.RTATB.Start();
+            if (vars.CBtimer.IsRunning && !current.IsInContinueBonus) vars.CBtimer.Stop();
+            if (!vars.CBtimer.IsRunning && current.IsInContinueBonus) vars.CBtimer.Start();
             break;
         case TimerPhase.Paused:
         case TimerPhase.Ended:
             if (vars.RTATB.IsRunning) vars.RTATB.Stop();
+            if (vars.CBtimer.IsRunning) vars.CBtimer.Stop();
             break;
     }
 
@@ -698,7 +704,7 @@ isLoading
 gameTime
 {
     if (settings["rta-tb"])
-        return vars.RTATB.Elapsed;
+        return vars.RTATB.Elapsed - (settings["continuebonus"] ? vars.CBtimer.Elapsed : TimeSpan.Zero);
     else
         return current.IGT + vars.AccumulatedIGT - vars.BufferIGT + current.SpecialIGT;
 }
