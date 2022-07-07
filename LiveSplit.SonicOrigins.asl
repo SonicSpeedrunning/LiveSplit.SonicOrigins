@@ -2,7 +2,7 @@
 // Autosplitter and IGT timer
 // Coding: Jujstme
 // contacts: just.tribe@gmail.com
-// Version: 1.2.2 (Jul 6th, 2022)
+// Version: 1.2.3 (Jul 8th, 2022)
 
 state("SonicOrigins") {}
 
@@ -32,17 +32,18 @@ init
     // jumptable 000000014008CB7F
     ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CD FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  19, 10, 0x942,  false)) { Name = "SonicCDStartTrigger" });
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120, 26, 0,      false)) { Name = "Act" });
-    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 121,  3, 0,      false)) { Name = "TimerIsRunning" });
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 122,  3, 0,      false)) { Name = "Centisecs" });
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 123,  3, 0,      false)) { Name = "Secs" });
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 124,  3, 0,      false)) { Name = "Mins" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120, 26,     0,  false)) { Name = "Act" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120, 26,     3,  false)) { Name = "S3SScomplete" }); // Used for Sonic 3 at the end of a special stage
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 121,  3,     0,  false)) { Name = "TimerIsRunning" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 122,  3,     0,  false)) { Name = "Centisecs" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 123,  3,     0,  false)) { Name = "Secs" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 124,  3,     0,  false)) { Name = "Mins" });
     vars.watchers.Add(new MemoryWatcher<int>( pointerPath(0x4 *  37, 10, 0x814,  false)) { Name = "SCDTimeBonus" });
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7,  0x2C,  true)) { Name = "SCDLives" });
-    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 *  11, 7, 0x1AC,  true)) { Name = "SCDDemoMode" });
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7, 0x22C,  true)) { Name = "SCDMissionCondition" });
-    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 *  11, 7, 0x248,  true)) { Name = "SCDMissionClear" });
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11, 7, 0xD8,  true)) { Name = "SCDSpecialStageReturn" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11,  7,  0x2C,  true)) { Name = "SCDLives" });
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 *  11,  7, 0x1AC,  true)) { Name = "SCDDemoMode" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11,  7, 0x22C,  true)) { Name = "SCDMissionCondition" });
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 *  11,  7, 0x248,  true)) { Name = "SCDMissionClear" });
+    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  11,  7,  0xD8,  true)) { Name = "SCDSpecialStageReturn" });
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 *  19, 10, 0x832,  false)) { Name = "SCDSScomplete" });
 
     // Dunno why these addresses, used in Sonic 3, are found in this jmp table, but it's convenient nonetheless
@@ -64,6 +65,7 @@ init
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7,  0xB0,      true)) { Name = "S1SpecialStageReturn" }); // Also works for Sonic 2
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 17,  7, 0x290,      true)) { Name = "S2MissionCondition" }); // 1 if mission clear, 2 if mission failed, 0 if mission not completed
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 17,  7, 0x2A4,      true)) { Name = "S2MissionClear" });
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 18,  7, 0,      true)) { Name = "S2GemBonus" });
     vars.watchers.Add(new MemoryWatcher<int> (pointerPath(0x4 * 71, 45, 0x20F8,    false)) { Name = "S1TimeBonus" });
     vars.watchers.Add(new MemoryWatcher<int> (pointerPath(0x4 * 71, 45, 0x2100,    false)) { Name = "S2TimeBonus" });
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 71, 45, 0x16B4,    false)) { Name = "S2SScomplete" });
@@ -98,8 +100,9 @@ init
     vars.watchers.Add(new MemoryWatcher<long>(ptr) { Name = "S3HPZFlag_0" });
     vars.watchers.Add(new MemoryWatcher<byte>(new DeepPointer(ptr, 0x4)) { Name = "S3HPZFlag_1", FailAction = MemoryWatcher.ReadFailAction.SetZeroOrNull });
 
-    ptr = scanner.Scan(new SigScanTarget(11, "74 ?? 41 B9 ???????? 4C 8D 1D") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
-    vars.watchers.Add(new MemoryWatcher<bool>(ptr + 0x4C) { Name = "S3SScomplete" });
+    //ptr = scanner.Scan(new SigScanTarget(11, "74 ?? 41 B9 ???????? 4C 8D 1D") { OnFound = (p, s, addr) => addr + 0x4 + p.ReadValue<int>(addr) }); checkptr();
+    //vars.watchers.Add(new MemoryWatcher<bool>(ptr + 0x4C) { Name = "S3SScomplete" });
+    //vars.watchers.Add(new MemoryWatcher<bool>(modules.First().BaseAddress + 0x3D34FF7) { Name = "S3SScomplete" }); // it's the game paused bool
 
     ptr = scanner.Scan(new SigScanTarget(1, "E8 ???????? 83 FE 05") { OnFound = (p, s, addr) => { var tempAddr = addr + 0x7 + p.ReadValue<int>(addr); return tempAddr + 0x4 + p.ReadValue<int>(tempAddr); } });
     vars.watchers.Add(new MemoryWatcher<int>(new DeepPointer(ptr, 0x18, 0xD8, 0xA8)) { Name = "BossRushTime" });
@@ -489,7 +492,7 @@ update
     // Sonic 2 has a bug with this so we're gonna exclude that game for this statement
     if (current.IsInSpecialStage)
     {
-        if (current.Game != vars.Game.Sonic2)
+        if (current.Game != vars.Game.Sonic2 && vars.Acts.ContainsKey(current.SpecialStageReturn))
             current.Act = vars.Acts[current.SpecialStageReturn];
     } else if (vars.Acts.ContainsKey(current.ActID)) {
         current.Act = vars.Acts[current.ActID];
@@ -523,11 +526,11 @@ update
                 break;
             case 1:
                 current.SpecialIGT = TimeSpan.FromSeconds(vars.watchers["Mins"].Current * 60 + vars.watchers["Secs"].Current + vars.watchers["Centisecs"].Current / 100d);
-                if (vars.watchers["S2SScomplete"].Current) current.SpecialIGT = old.SpecialIGT;
+                if (vars.watchers["S2SScomplete"].Current || vars.watchers["S2GemBonus"].Current) current.SpecialIGT = old.SpecialIGT;
                 break;
             case 2:
                 current.SpecialIGT = TimeSpan.FromSeconds(vars.watchers["S3Mins"].Current * 60 + vars.watchers["S3Secs"].Current + vars.watchers["S3Centisecs"].Current / 100d);
-                if (current.ActID != 2052 && current.ActID != 2053 && current.ActID != 2054 && vars.watchers["S3SScomplete"].Current) current.SpecialIGT = old.SpecialIGT;
+                if (current.ActID != 2052 && current.ActID != 2053 && current.ActID != 2054 && (vars.watchers["S3SScomplete"].Current || vars.watchers["S3SScomplete"].Old || vars.watchers["S3HPZFlag_1"].Current == 2) ) current.SpecialIGT = old.SpecialIGT;
                 if (!current.TimerIsRunning) current.SpecialIGT = old.SpecialIGT;
                 break;
             case 3:
