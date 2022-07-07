@@ -33,7 +33,7 @@ init
     ptr = scanner.Scan(new SigScanTarget(-4, "49 03 CD FF E1 8B 05") { OnFound = (p, s, addr) => modules.First().BaseAddress + p.ReadValue<int>(addr) }); checkptr();
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 *  19, 10, 0x942,  false)) { Name = "SonicCDStartTrigger" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120, 26,     0,  false)) { Name = "Act" });
-    vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 120, 26,     3,  false)) { Name = "S3SScomplete" }); // Used for Sonic 3 at the end of a special stage
+    vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 120, 26,     3,  false)) { Name = "S3SScomplete" }); // Used for Sonic 3 at the end of a special stage
     vars.watchers.Add(new MemoryWatcher<bool>(pointerPath(0x4 * 121,  3,     0,  false)) { Name = "TimerIsRunning" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 122,  3,     0,  false)) { Name = "Centisecs" });
     vars.watchers.Add(new MemoryWatcher<byte>(pointerPath(0x4 * 123,  3,     0,  false)) { Name = "Secs" });
