@@ -56,7 +56,7 @@ namespace LiveSplit.SonicOrigins
             DemoMode = pointerPath(0x4 * 17, 15, 0x5 * 4, true);
             GameMode = pointerPath(0x4 * 17, 15, 0x8F * 4, true);
             ScoreTally = pointerPath(0x4 * 0, 0, 0x20D0 + 0xD4, false);
-            ContinueBonus = pointerPath(0x4 * 0, 0, 0x20D0 + 0xD4, false);
+            ContinueBonus = pointerPath(0x4 * 0, 0, 0x20D0 + 0x44, false);
 
             // Setting up fake watchers
             LevelWatcher = new FakeMemoryWatcher<LevelID>(() =>
